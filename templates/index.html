@@ -63,13 +63,18 @@
       th {
         background-color: #f2f2f2;
       }
+
+      /* Hide buttons initially */
+      .hidden {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <h2>LiDAR 최신 데이터</h2>
-    <button onclick="fetchLidarData()">최신 LiDAR 데이터 가져오기</button>
-    <button onclick="fetchCloudPointData()">클라우드 포인트 데이터 가져오기</button>
-    <button onclick="resetZoom()">줌 초기화</button>
+    <button id="lidar-data-btn" class="hidden" onclick="fetchLidarData()">최신 LiDAR 데이터 가져오기</button>
+    <button id="cloud-data-btn" class="hidden" onclick="fetchCloudPointData()">클라우드 포인트 데이터 가져오기</button>
+    <button id="zoom-reset-btn" class="hidden" onclick="resetZoom()">줌 초기화</button>
 
     <div class="container">
       <h2>LiDAR 데이터 수신</h2>
@@ -260,6 +265,12 @@
           if (response.ok) {
             statusMessage.textContent = "연결 성공! LiDAR 데이터를 수신 중...";
             document.getElementById("charts-container").style.display = "block"; // 그래프와 정보를 표시
+
+            // Hide buttons after successful connection
+            document.getElementById("lidar-data-btn").classList.remove("hidden");
+            document.getElementById("cloud-data-btn").classList.remove("hidden");
+            document.getElementById("zoom-reset-btn").classList.remove("hidden");
+
             setInterval(fetchLidarData, 5000);
             setInterval(fetchCloudPointData, 5000);
           } else {
