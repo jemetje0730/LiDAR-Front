@@ -68,13 +68,21 @@
   <body>
     <h2>LiDAR 최신 데이터</h2>
     <button onclick="fetchLidarData()">최신 LiDAR 데이터 가져오기</button>
-    <button onclick="fetchCloudPointData()">
-      클라우드 포인트 데이터 가져오기
-    </button>
-    <!-- Cloud Point 데이터 추가 -->
+    <button onclick="fetchCloudPointData()">클라우드 포인트 데이터 가져오기</button>
     <button onclick="resetZoom()">줌 초기화</button>
 
     <div class="container">
+      <h2>LiDAR 데이터 수신</h2>
+      <label for="ip-input">IP 주소:</label>
+      <input type="text" id="ip-input" placeholder="예: 192.168.123.100" />
+      <label for="port-input">포트 번호:</label>
+      <input type="number" id="port-input" placeholder="예: 5000" />
+      <button onclick="connectToDevice()">연결</button>
+
+      <div id="status-message"></div>
+    </div>
+
+    <div class="container" id="charts-container" style="display: none;">
       <div class="charts-wrapper">
         <div class="canvas-wrapper">
           <canvas id="lidarChart"></canvas>
@@ -140,12 +148,12 @@
         options: {
           maintainAspectRatio: true,
           responsive: true,
-          aspectRatio: 1, // 가로와 세로의 비율을 1:1로 설정 (정사각형 모양)
+          aspectRatio: 1,
           layout: { padding: 0 },
           scales: {
             x: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -154,7 +162,7 @@
             },
             y: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -192,12 +200,12 @@
         options: {
           maintainAspectRatio: true,
           responsive: true,
-          aspectRatio: 1, // 가로와 세로의 비율을 1:1로 설정 (정사각형 모양)
+          aspectRatio: 1,
           layout: { padding: 0 },
           scales: {
             x: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -206,7 +214,7 @@
             },
             y: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -228,14 +236,43 @@
         },
       });
 
-      // 페이지 로드 시 자동으로 데이터 가져오기
       window.onload = function () {
-        // 5초마다 최신 LiDAR 데이터와 Cloud Point 데이터를 가져옵니다.
-        setInterval(fetchLidarData, 5000); // 5000ms = 5초
-        setInterval(fetchCloudPointData, 5000); // 5000ms = 5초
+        setInterval(fetchLidarData, 5000);
+        setInterval(fetchCloudPointData, 5000);
       };
 
-      // ✅ 최신 LiDAR 데이터 가져오기
+      async function connectToDevice() {
+        const ip = document.getElementById("ip-input").value;
+        const port = document.getElementById("port-input").value;
+        const statusMessage = document.getElementById("status-message");
+
+        if (!ip || !port) {
+          statusMessage.textContent = "IP 주소와 포트 번호를 입력해주세요.";
+          return;
+        }
+
+        try {
+          console.log(`연결 시도 중... IP: ${ip}, 포트: ${port}`);
+          const response = await fetch(`http://${ip}:${port}/`, {
+            method: "GET",
+          });
+
+          if (response.ok) {
+            statusMessage.textContent = "연결 성공! LiDAR 데이터를 수신 중...";
+            document.getElementById("charts-container").style.display = "block"; // 그래프와 정보를 표시
+            setInterval(fetchLidarData, 5000);
+            setInterval(fetchCloudPointData, 5000);
+          } else {
+            statusMessage.textContent =
+              "연결 실패! 올바른 IP와 포트를 확인해주세요.";
+            document.getElementById("charts-container").style.display = "none"; // 연결 실패 시 그래프와 정보 숨기기
+          }
+        } catch (error) {
+          statusMessage.textContent = `연결 실패: ${error.message}`;
+          document.getElementById("charts-container").style.display = "none"; // 연결 실패 시 그래프와 정보 숨기기
+        }
+      }
+
       async function fetchLidarData() {
         try {
           console.log("🔄 LiDAR 데이터 요청 중...");
@@ -247,7 +284,7 @@
 
           if (data.latest_lidar_xyz_points) {
             let angle = 0.0;
-            const angleStep = 0.25; // LiDAR 데이터 각도 간격 (0.25도)
+            const angleStep = 0.25;
             const points = data.latest_lidar_xyz_points.map((p) => {
               return {
                 x: p.x,
@@ -260,11 +297,9 @@
 
             console.log("📡 변환된 LiDAR 포인트 데이터:", points.slice(0, 5));
 
-            // LiDAR 데이터는 첫 번째 차트에 업데이트
             chart.data.datasets[0].data = points;
             chart.update();
-
-            updatePointInfo(points, "lidar"); // LiDAR 데이터만 포인트 정보 업데이트
+            updatePointInfo(points, "lidar");
           } else {
             console.log("❌ 새로운 LiDAR 데이터가 없습니다.");
           }
@@ -276,9 +311,7 @@
       async function fetchCloudPointData() {
         try {
           console.log("🔄 Cloud LiDAR 데이터 요청 중...");
-          const response = await fetch(
-            "http://127.0.0.1:8000/cloud_point_data"
-          );
+          const response = await fetch("http://127.0.0.1:8000/cloud_point_data");
           console.log("📡 응답 상태 코드:", response.status);
 
           const data = await response.json();
@@ -289,7 +322,7 @@
             data.latest_cloud_point_xyz_points.length > 0
           ) {
             let angle = 0.0;
-            const angleStep = 0.25; // Cloud 포인트 데이터 각도 간격 (0.25도)
+            const angleStep = 0.25;
             const cloudPoints = data.latest_cloud_point_xyz_points.map((p) => {
               return {
                 x: p.x,
@@ -300,16 +333,11 @@
               };
             });
 
-            console.log(
-              "📡 변환된 Cloud 포인트 데이터:",
-              cloudPoints.slice(0, 5)
-            );
+            console.log("📡 변환된 Cloud 포인트 데이터:", cloudPoints.slice(0, 5));
 
-            // Cloud 데이터는 두 번째 차트에 업데이트
             cloudChart.data.datasets[0].data = cloudPoints;
             cloudChart.update();
-
-            updatePointInfo(cloudPoints, "cloud"); // Cloud 데이터만 포인트 정보 업데이트
+            updatePointInfo(cloudPoints, "cloud");
           } else {
             console.log("❌ 새로운 Cloud 포인트 데이터가 없습니다.");
           }
@@ -318,18 +346,16 @@
         }
       }
 
-      // 줌 리셋 함수
       function resetZoom() {
         chart.resetZoom();
         cloudChart.resetZoom();
       }
 
-      // 포인트 정보를 테이블로 표시 (LiDAR 데이터와 Cloud 데이터 구분)
       function updatePointInfo(points, type) {
         const infoBoxId =
           type === "lidar" ? "lidar-point-info" : "cloud-point-info";
         const infoBox = document.getElementById(infoBoxId);
-        infoBox.innerHTML = ""; // 기존 정보 삭제
+        infoBox.innerHTML = "";
 
         points.forEach((point) => {
           let row = document.createElement("tr");
@@ -338,23 +364,23 @@
           angleCell.textContent = `${point.angle}°`;
 
           let xCell = document.createElement("td");
-          xCell.textContent = point.x.toFixed(2); // x 좌표 소수점 2자리로 표시
+          xCell.textContent = point.x.toFixed(2);
 
           let yCell = document.createElement("td");
-          yCell.textContent = point.y.toFixed(2); // y 좌표 소수점 2자리로 표시
+          yCell.textContent = point.y.toFixed(2);
 
           let zCell = document.createElement("td");
-          zCell.textContent = point.z.toFixed(2); // z 좌표 소수점 2자리로 표시
+          zCell.textContent = point.z.toFixed(2);
 
           let distanceCell = document.createElement("td");
-          distanceCell.textContent = point.distance.toFixed(2); // 거리 소수점 2자리로 표시
+          distanceCell.textContent = point.distance.toFixed(2);
 
           row.appendChild(angleCell);
           row.appendChild(xCell);
           row.appendChild(yCell);
           row.appendChild(zCell);
           row.appendChild(distanceCell);
-          infoBox.appendChild(row); // 테이블에 추가
+          infoBox.appendChild(row);
         });
       }
     </script>
