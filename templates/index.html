@@ -242,10 +242,8 @@
       });
 
       window.onload = function () {
-        setInterval(fetchLidarData, 5000);
-        setInterval(fetchCloudPointData, 5000);
-      };
-
+      }
+      
       async function connectToDevice() {
         const ip = document.getElementById("ip-input").value;
         const port = document.getElementById("port-input").value;
