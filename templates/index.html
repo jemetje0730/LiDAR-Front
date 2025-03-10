@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
@@ -89,7 +89,6 @@
                 <th>Y</th>
                 <th>Z</th>
                 <th>거리(m)</th>
-                <th>초기거리</th>
               </tr>
             </thead>
             <tbody id="lidar-point-info"></tbody>
@@ -111,7 +110,6 @@
                 <th>Y</th>
                 <th>Z</th>
                 <th>거리(m)</th>
-                <th>초기거리</th>
               </tr>
             </thead>
             <tbody id="cloud-point-info"></tbody>
@@ -242,38 +240,39 @@
         try {
           console.log("🔄 LiDAR 데이터 요청 중...");
           const response = await fetch("http://127.0.0.1:8000/lidar_data");
+          console.log("📡 응답 상태 코드:", response.status);
+
           const data = await response.json();
-          console.log("📡 응답 데이터:", data);
+          console.log("✅ 변환된 JSON 데이터:", data);
 
           if (data.latest_lidar_xyz_points) {
             let angle = 0.0;
-            const angleStep = 0.25;
+            const angleStep = 0.25; // LiDAR 데이터 각도 간격 (0.25도)
             const points = data.latest_lidar_xyz_points.map((p) => {
-              console.log("Raw distance:", p.raw_distance);
-              console.log("Calculated distance:", p.distance);
-
               return {
                 x: p.x,
                 y: p.y,
                 z: p.z,
-                distance: p.distance, // distance는 calculated distance
+                distance: p.distance,
                 angle: (angle += angleStep).toFixed(2),
-                raw_distance: p.raw_distance, // raw_distance를 별도로 저장
               };
             });
 
-            // 데이터가 정확히 처리되고 있는지 확인
-            console.log("변환된 LiDAR 포인트 데이터:", points.slice(0, 5));
+            console.log("📡 변환된 LiDAR 포인트 데이터:", points.slice(0, 5));
+
+            // LiDAR 데이터는 첫 번째 차트에 업데이트
             chart.data.datasets[0].data = points;
             chart.update();
-            updatePointInfo(points, "lidar");
+
+            updatePointInfo(points, "lidar"); // LiDAR 데이터만 포인트 정보 업데이트
+          } else {
+            console.log("❌ 새로운 LiDAR 데이터가 없습니다.");
           }
         } catch (error) {
           console.error("⚠️ LiDAR 데이터 가져오기 실패:", error);
         }
       }
 
-      // ✅ 클라우드 포인트 데이터 가져오기
       async function fetchCloudPointData() {
         try {
           console.log("🔄 Cloud LiDAR 데이터 요청 중...");
@@ -325,6 +324,7 @@
         cloudChart.resetZoom();
       }
 
+      // 포인트 정보를 테이블로 표시 (LiDAR 데이터와 Cloud 데이터 구분)
       function updatePointInfo(points, type) {
         const infoBoxId =
           type === "lidar" ? "lidar-point-info" : "cloud-point-info";
@@ -338,36 +338,23 @@
           angleCell.textContent = `${point.angle}°`;
 
           let xCell = document.createElement("td");
-          xCell.textContent = point.x.toFixed(2);
+          xCell.textContent = point.x.toFixed(2); // x 좌표 소수점 2자리로 표시
 
           let yCell = document.createElement("td");
-          yCell.textContent = point.y.toFixed(2);
+          yCell.textContent = point.y.toFixed(2); // y 좌표 소수점 2자리로 표시
 
           let zCell = document.createElement("td");
-          zCell.textContent = point.z.toFixed(2);
+          zCell.textContent = point.z.toFixed(2); // z 좌표 소수점 2자리로 표시
 
           let distanceCell = document.createElement("td");
-          distanceCell.textContent = point.distance.toFixed(2);
+          distanceCell.textContent = point.distance.toFixed(2); // 거리 소수점 2자리로 표시
 
           row.appendChild(angleCell);
           row.appendChild(xCell);
           row.appendChild(yCell);
           row.appendChild(zCell);
           row.appendChild(distanceCell);
-
-          // LiDAR 데이터에는 raw_distance가 있을 수 있으므로 조건문으로 처리
-          if (type === "lidar" && point.raw_distance !== undefined) {
-            let rawDistanceCell = document.createElement("td");
-            rawDistanceCell.textContent = point.raw_distance.toFixed(2); // raw_distance는 LiDAR 데이터에만 있음
-            row.appendChild(rawDistanceCell);
-          } else {
-            // Cloud 데이터에서는 raw_distance 없이도 처리하므로 빈 셀을 추가하지 않음
-            let rawDistanceCell = document.createElement("td");
-            rawDistanceCell.textContent = "-"; // raw_distance가 없는 경우 표시할 값
-            row.appendChild(rawDistanceCell);
-          }
-
-          infoBox.appendChild(row);
+          infoBox.appendChild(row); // 테이블에 추가
         });
       }
     </script>
