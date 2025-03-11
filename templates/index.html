@@ -72,28 +72,17 @@
   </head>
   <body>
     <h2>LiDAR 최신 데이터</h2>
-    <button id="lidar-data-btn" class="hidden" onclick="fetchLidarData()">
+    <button id="lidar-data-btn" class="button" onclick="fetchLidarData()">
       최신 LiDAR 데이터 가져오기
     </button>
-    <button id="cloud-data-btn" class="hidden" onclick="fetchCloudPointData()">
+    <button id="cloud-data-btn" class="button" onclick="fetchCloudPointData()">
       클라우드 포인트 데이터 가져오기
     </button>
-    <button id="zoom-reset-btn" class="hidden" onclick="resetZoom()">
+    <button id="zoom-reset-btn" class="button" onclick="resetZoom()">
       줌 초기화
     </button>
 
-    <div class="container">
-      <h2>LiDAR 데이터 수신</h2>
-      <label for="ip-input">IP 주소:</label>
-      <input type="text" id="ip-input" placeholder="예: 192.168.123.100" />
-      <label for="port-input">포트 번호:</label>
-      <input type="number" id="port-input" placeholder="예: 5000" />
-      <button onclick="connectToDevice()">연결</button>
-
-      <div id="status-message"></div>
-    </div>
-
-    <div class="container" id="charts-container" style="display: none">
+    <div class="container" id="charts-container">
       <div class="charts-wrapper">
         <div class="canvas-wrapper">
           <canvas id="lidarChart"></canvas>
@@ -247,60 +236,10 @@
         },
       });
 
-      window.onload = function () {};
-
-      async function connectToDevice() {
-        const ip = document.getElementById("ip-input").value;
-        const port = document.getElementById("port-input").value;
-        const statusMessage = document.getElementById("status-message");
-
-        if (!ip || !port) {
-          statusMessage.textContent = "IP 주소와 포트 번호를 입력해주세요.";
-          return;
-        }
-
-        try {
-          console.log(`연결 시도 중... IP: ${ip}, 포트: ${port}`);
-          const response = await fetch(`http://${ip}:${port}/`, {
-            method: "GET",
-          });
-
-          if (response.ok) {
-            statusMessage.textContent = "연결 성공! LiDAR 데이터를 수신 중...";
-            document.getElementById("charts-container").style.display = "block"; // UI 표시
-
-            // ✅ 버튼 활성화
-            document
-              .getElementById("lidar-data-btn")
-              .classList.remove("hidden");
-            document
-              .getElementById("cloud-data-btn")
-              .classList.remove("hidden");
-            document
-              .getElementById("zoom-reset-btn")
-              .classList.remove("hidden");
-
-            // ✅ 이미 실행 중이면 setInterval 중복 방지
-            if (!window.isFetching) {
-              window.isFetching = true;
-              setInterval(fetchLidarData, 5000);
-              setInterval(fetchCloudPointData, 5000);
-            }
-          } else {
-            statusMessage.textContent =
-              "연결 실패! 올바른 IP와 포트를 확인해주세요.";
-            hideUI();
-          }
-        } catch (error) {
-          statusMessage.textContent = `연결 실패: ${error.message}`;
-          hideUI();
-        }
-      }
-
-      function hideUI() {
-        document.getElementById("charts-container").style.display = "none";
-        window.isFetching = false; // 데이터 요청 중지 상태
-      }
+      window.onload = function () {
+        setInterval(fetchLidarData, 5000);
+        setInterval(fetchCloudPointData, 5000);
+      };
 
       async function fetchLidarData() {
         try {
