@@ -84,7 +84,13 @@
         try {
           console.log(`🔄 연결 시도 중... IP: ${ip}, 포트: ${port}`);
           const response = await fetch(
-            `http://127.0.0.1:8000/check_connection?ip=${ip}&port=${port}`
+            `http://127.0.0.1:8000/check_connection?ip=${ip}&port=${port}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
           );
           const data = await response.json();
           console.log("📡 서버 응답:", data);
