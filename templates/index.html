@@ -269,11 +269,22 @@
             statusMessage.textContent = "연결 성공! LiDAR 데이터를 수신 중...";
             document.getElementById("charts-container").style.display = "block"; // UI 표시
 
+            // ✅ 버튼 활성화
+            document
+              .getElementById("lidar-data-btn")
+              .classList.remove("hidden");
+            document
+              .getElementById("cloud-data-btn")
+              .classList.remove("hidden");
+            document
+              .getElementById("zoom-reset-btn")
+              .classList.remove("hidden");
+
             // ✅ 이미 실행 중이면 setInterval 중복 방지
             if (!window.isFetching) {
               window.isFetching = true;
-              setInterval(fetchLidarData, 5000);
-              setInterval(fetchCloudPointData, 5000);
+              setInterval(fetchLidarData, 10000);
+              setInterval(fetchCloudPointData, 10000);
             }
           } else {
             statusMessage.textContent =
