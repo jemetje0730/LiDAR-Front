@@ -283,8 +283,8 @@
             // ✅ 이미 실행 중이면 setInterval 중복 방지
             if (!window.isFetching) {
               window.isFetching = true;
-              setInterval(fetchLidarData, 5000);
-              setInterval(fetchCloudPointData, 5000);
+              setInterval(fetchLidarData, 8000);
+              setInterval(fetchCloudPointData, 8000);
             }
           } else {
             statusMessage.textContent =
