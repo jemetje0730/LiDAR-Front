@@ -102,7 +102,7 @@
             localStorage.setItem("lidar_port", port);
             window.location.href = "/index";
           } else {
-            statusMessage.textContent = `❌ 연결 실패: ${data.message}`;
+            statusMessage.textContent = `❌ 연결 실패 ${data.message}`;
           }
         } catch (error) {
           statusMessage.textContent = `❌ 연결 실패: 서버 응답 없음`;
