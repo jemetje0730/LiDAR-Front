@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
@@ -63,18 +63,26 @@
       th {
         background-color: #f2f2f2;
       }
+
+      /* Hide buttons initially */
+      .hidden {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <h2>LiDAR 최신 데이터</h2>
-    <button onclick="fetchLidarData()">최신 LiDAR 데이터 가져오기</button>
-    <button onclick="fetchCloudPointData()">
+    <button id="lidar-data-btn" class="button" onclick="fetchLidarData()">
+      최신 LiDAR 데이터 가져오기
+    </button>
+    <button id="cloud-data-btn" class="button" onclick="fetchCloudPointData()">
       클라우드 포인트 데이터 가져오기
     </button>
-    <!-- Cloud Point 데이터 추가 -->
-    <button onclick="resetZoom()">줌 초기화</button>
+    <button id="zoom-reset-btn" class="button" onclick="resetZoom()">
+      줌 초기화
+    </button>
 
-    <div class="container">
+    <div class="container" id="charts-container">
       <div class="charts-wrapper">
         <div class="canvas-wrapper">
           <canvas id="lidarChart"></canvas>
@@ -89,7 +97,6 @@
                 <th>Y</th>
                 <th>Z</th>
                 <th>거리(m)</th>
-                <th>초기거리</th>
               </tr>
             </thead>
             <tbody id="lidar-point-info"></tbody>
@@ -111,7 +118,6 @@
                 <th>Y</th>
                 <th>Z</th>
                 <th>거리(m)</th>
-                <th>초기거리</th>
               </tr>
             </thead>
             <tbody id="cloud-point-info"></tbody>
@@ -142,12 +148,12 @@
         options: {
           maintainAspectRatio: true,
           responsive: true,
-          aspectRatio: 1, // 가로와 세로의 비율을 1:1로 설정 (정사각형 모양)
+          aspectRatio: 1,
           layout: { padding: 0 },
           scales: {
             x: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -156,7 +162,7 @@
             },
             y: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -194,12 +200,12 @@
         options: {
           maintainAspectRatio: true,
           responsive: true,
-          aspectRatio: 1, // 가로와 세로의 비율을 1:1로 설정 (정사각형 모양)
+          aspectRatio: 1,
           layout: { padding: 0 },
           scales: {
             x: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -208,7 +214,7 @@
             },
             y: {
               min: -25,
-              max: 25, // LiDAR와 Cloud 포인트의 범위를 동일하게 맞춤
+              max: 25,
               grid: {
                 color: (context) =>
                   context.tick.value === 0 ? "black" : "gray",
@@ -230,50 +236,46 @@
         },
       });
 
-      // 페이지 로드 시 자동으로 데이터 가져오기
       window.onload = function () {
-        // 5초마다 최신 LiDAR 데이터와 Cloud Point 데이터를 가져옵니다.
-        setInterval(fetchLidarData, 5000); // 5000ms = 5초
-        setInterval(fetchCloudPointData, 5000); // 5000ms = 5초
+        setInterval(fetchLidarData, 5000);
+        setInterval(fetchCloudPointData, 5000);
       };
 
-      // ✅ 최신 LiDAR 데이터 가져오기
       async function fetchLidarData() {
         try {
           console.log("🔄 LiDAR 데이터 요청 중...");
           const response = await fetch("http://127.0.0.1:8000/lidar_data");
+          console.log("📡 응답 상태 코드:", response.status);
+
           const data = await response.json();
-          console.log("📡 응답 데이터:", data);
+          console.log("✅ 변환된 JSON 데이터:", data);
 
           if (data.latest_lidar_xyz_points) {
             let angle = 0.0;
             const angleStep = 0.25;
             const points = data.latest_lidar_xyz_points.map((p) => {
-              console.log("Raw distance:", p.raw_distance);
-              console.log("Calculated distance:", p.distance);
-
               return {
                 x: p.x,
                 y: p.y,
                 z: p.z,
-                distance: p.distance, // distance는 calculated distance
+                distance: p.distance,
                 angle: (angle += angleStep).toFixed(2),
-                raw_distance: p.raw_distance, // raw_distance를 별도로 저장
               };
             });
 
-            // 데이터가 정확히 처리되고 있는지 확인
-            console.log("변환된 LiDAR 포인트 데이터:", points.slice(0, 5));
+            console.log("📡 변환된 LiDAR 포인트 데이터:", points.slice(0, 5));
+
             chart.data.datasets[0].data = points;
             chart.update();
             updatePointInfo(points, "lidar");
+          } else {
+            console.log("❌ 새로운 LiDAR 데이터가 없습니다.");
           }
         } catch (error) {
           console.error("⚠️ LiDAR 데이터 가져오기 실패:", error);
         }
       }
 
-      // ✅ 클라우드 포인트 데이터 가져오기
       async function fetchCloudPointData() {
         try {
           console.log("🔄 Cloud LiDAR 데이터 요청 중...");
@@ -290,7 +292,7 @@
             data.latest_cloud_point_xyz_points.length > 0
           ) {
             let angle = 0.0;
-            const angleStep = 0.25; // Cloud 포인트 데이터 각도 간격 (0.25도)
+            const angleStep = 0.25;
             const cloudPoints = data.latest_cloud_point_xyz_points.map((p) => {
               return {
                 x: p.x,
@@ -306,11 +308,9 @@
               cloudPoints.slice(0, 5)
             );
 
-            // Cloud 데이터는 두 번째 차트에 업데이트
             cloudChart.data.datasets[0].data = cloudPoints;
             cloudChart.update();
-
-            updatePointInfo(cloudPoints, "cloud"); // Cloud 데이터만 포인트 정보 업데이트
+            updatePointInfo(cloudPoints, "cloud");
           } else {
             console.log("❌ 새로운 Cloud 포인트 데이터가 없습니다.");
           }
@@ -319,7 +319,6 @@
         }
       }
 
-      // 줌 리셋 함수
       function resetZoom() {
         chart.resetZoom();
         cloudChart.resetZoom();
@@ -329,7 +328,7 @@
         const infoBoxId =
           type === "lidar" ? "lidar-point-info" : "cloud-point-info";
         const infoBox = document.getElementById(infoBoxId);
-        infoBox.innerHTML = ""; // 기존 정보 삭제
+        infoBox.innerHTML = "";
 
         points.forEach((point) => {
           let row = document.createElement("tr");
@@ -354,19 +353,6 @@
           row.appendChild(yCell);
           row.appendChild(zCell);
           row.appendChild(distanceCell);
-
-          // LiDAR 데이터에는 raw_distance가 있을 수 있으므로 조건문으로 처리
-          if (type === "lidar" && point.raw_distance !== undefined) {
-            let rawDistanceCell = document.createElement("td");
-            rawDistanceCell.textContent = point.raw_distance.toFixed(2); // raw_distance는 LiDAR 데이터에만 있음
-            row.appendChild(rawDistanceCell);
-          } else {
-            // Cloud 데이터에서는 raw_distance 없이도 처리하므로 빈 셀을 추가하지 않음
-            let rawDistanceCell = document.createElement("td");
-            rawDistanceCell.textContent = "-"; // raw_distance가 없는 경우 표시할 값
-            row.appendChild(rawDistanceCell);
-          }
-
           infoBox.appendChild(row);
         });
       }
