@@ -24,22 +24,9 @@
         width: 45vw;
         max-width: 600px;
       }
-      .canvas-wrapper::before {
-        content: "";
-        display: block;
-        padding-top: 100%;
-      }
       canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
         width: 100%;
         height: 100%;
-      }
-      .info-box-wrapper {
-        display: flex;
-        justify-content: space-between;
-        width: 90%;
       }
       .info-box {
         width: 300px;
@@ -54,8 +41,7 @@
         border-collapse: collapse;
         font-size: 14px;
       }
-      th,
-      td {
+      th, td {
         border: 1px solid #ddd;
         padding: 6px;
         text-align: center;
@@ -63,26 +49,13 @@
       th {
         background-color: #f2f2f2;
       }
-
-      /* Hide buttons initially */
-      .hidden {
-        display: none;
-      }
     </style>
   </head>
   <body>
     <h2>LiDAR 최신 데이터</h2>
-    <button id="lidar-data-btn" class="button" onclick="fetchLidarData()">
-      최신 LiDAR 데이터 가져오기
-    </button>
-    <button id="cloud-data-btn" class="button" onclick="fetchCloudPointData()">
-      클라우드 포인트 데이터 가져오기
-    </button>
-    <button id="zoom-reset-btn" class="button" onclick="resetZoom()">
-      줌 초기화
-    </button>
+    <button id="zoom-reset-btn" onclick="resetZoom()">줌 초기화</button>
 
-    <div class="container" id="charts-container">
+    <div class="container">
       <div class="charts-wrapper">
         <div class="canvas-wrapper">
           <canvas id="lidarChart"></canvas>
@@ -91,13 +64,7 @@
           <h3>📌 LiDAR 포인트 정보</h3>
           <table>
             <thead>
-              <tr>
-                <th>각도(°)</th>
-                <th>X</th>
-                <th>Y</th>
-                <th>Z</th>
-                <th>거리(m)</th>
-              </tr>
+              <tr><th>각도(°)</th><th>X</th><th>Y</th><th>Z</th><th>거리(m)</th></tr>
             </thead>
             <tbody id="lidar-point-info"></tbody>
           </table>
@@ -112,13 +79,7 @@
           <h3>📌 Cloud 포인트 정보</h3>
           <table>
             <thead>
-              <tr>
-                <th>각도(°)</th>
-                <th>X</th>
-                <th>Y</th>
-                <th>Z</th>
-                <th>거리(m)</th>
-              </tr>
+              <tr><th>각도(°)</th><th>X</th><th>Y</th><th>Z</th><th>거리(m)</th></tr>
             </thead>
             <tbody id="cloud-point-info"></tbody>
           </table>
@@ -128,195 +89,79 @@
 
     <script>
       const ctx = document.getElementById("lidarChart").getContext("2d");
-      const cloudCtx = document
-        .getElementById("cloudLidarChart")
-        .getContext("2d");
+      const cloudCtx = document.getElementById("cloudLidarChart").getContext("2d");
 
-      const chart = new Chart(ctx, {
-        type: "scatter",
-        data: {
-          datasets: [
-            {
-              label: "LiDAR Points (UDP)",
-              data: [],
-              borderColor: "blue",
-              backgroundColor: "rgba(0, 0, 255, 0.5)",
-              pointRadius: 2,
-            },
-          ],
-        },
-        options: {
-          maintainAspectRatio: true,
-          responsive: true,
-          aspectRatio: 1,
-          layout: { padding: 0 },
-          scales: {
-            x: {
-              min: -25,
-              max: 25,
-              grid: {
-                color: (context) =>
-                  context.tick.value === 0 ? "black" : "gray",
-                lineWidth: (context) => (context.tick.value === 0 ? 2 : 0.5),
-              },
-            },
-            y: {
-              min: -25,
-              max: 25,
-              grid: {
-                color: (context) =>
-                  context.tick.value === 0 ? "black" : "gray",
-                lineWidth: (context) => (context.tick.value === 0 ? 2 : 0.5),
-              },
-            },
-          },
-          plugins: {
-            legend: { display: true },
-            zoom: {
-              pan: { enabled: true, mode: "xy" },
-              zoom: {
-                wheel: { enabled: true },
-                pinch: { enabled: true },
-                mode: "xy",
-              },
-            },
-          },
-        },
-      });
+      const chart = new Chart(ctx, createChartConfig("blue"));
+      const cloudChart = new Chart(cloudCtx, createChartConfig("red"));
 
-      const cloudChart = new Chart(cloudCtx, {
-        type: "scatter",
-        data: {
-          datasets: [
-            {
-              label: "LiDAR Points (Cloud)",
-              data: [],
-              borderColor: "red",
-              backgroundColor: "rgba(255, 0, 0, 0.5)",
-              pointRadius: 2,
-            },
-          ],
-        },
-        options: {
-          maintainAspectRatio: true,
-          responsive: true,
-          aspectRatio: 1,
-          layout: { padding: 0 },
-          scales: {
-            x: {
-              min: -25,
-              max: 25,
-              grid: {
-                color: (context) =>
-                  context.tick.value === 0 ? "black" : "gray",
-                lineWidth: (context) => (context.tick.value === 0 ? 2 : 0.5),
-              },
-            },
-            y: {
-              min: -25,
-              max: 25,
-              grid: {
-                color: (context) =>
-                  context.tick.value === 0 ? "black" : "gray",
-                lineWidth: (context) => (context.tick.value === 0 ? 2 : 0.5),
-              },
-            },
-          },
-          plugins: {
-            legend: { display: true },
-            zoom: {
-              pan: { enabled: true, mode: "xy" },
-              zoom: {
-                wheel: { enabled: true },
-                pinch: { enabled: true },
-                mode: "xy",
-              },
-            },
-          },
-        },
-      });
+      let cloudSocket;
+      let lastCloudData = [];
 
-      window.onload = function () {
-        setInterval(fetchLidarData, 5000);
-        setInterval(fetchCloudPointData, 5000);
-      };
+      function createChartConfig(color) {
+        return {
+          type: "scatter",
+          data: { datasets: [{ label: "LiDAR Points", data: [], borderColor: color, backgroundColor: `${color}80`, pointRadius: 2 }] },
+          options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            aspectRatio: 1,
+            scales: { x: createAxis(), y: createAxis() },
+            plugins: { zoom: { pan: { enabled: true, mode: "xy" }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "xy" } } }
+          }
+        };
+      }
+
+      function createAxis() {
+        return {
+          min: -25,
+          max: 25,
+          grid: { color: (ctx) => (ctx.tick.value === 0 ? "black" : "gray"), lineWidth: (ctx) => (ctx.tick.value === 0 ? 2 : 0.5) }
+        };
+      }
 
       async function fetchLidarData() {
         try {
-          console.log("🔄 LiDAR 데이터 요청 중...");
           const response = await fetch("http://127.0.0.1:8000/lidar_data");
-          console.log("📡 응답 상태 코드:", response.status);
-
+          if (!response.ok) return console.warn("❌ LiDAR 데이터 없음");
           const data = await response.json();
-          console.log("✅ 변환된 JSON 데이터:", data);
-
-          if (data.latest_lidar_xyz_points) {
-            let angle = 0.0;
-            const angleStep = 0.25;
-            const points = data.latest_lidar_xyz_points.map((p) => {
-              return {
-                x: p.x,
-                y: p.y,
-                z: p.z,
-                distance: p.distance,
-                angle: (angle += angleStep).toFixed(2),
-              };
-            });
-
-            console.log("📡 변환된 LiDAR 포인트 데이터:", points.slice(0, 5));
-
-            chart.data.datasets[0].data = points;
-            chart.update();
-            updatePointInfo(points, "lidar");
-          } else {
-            console.log("❌ 새로운 LiDAR 데이터가 없습니다.");
-          }
+          updateChart(chart, data.latest_lidar_xyz_points || []);
+          updatePointInfo(data.latest_lidar_xyz_points || [], "lidar");
         } catch (error) {
           console.error("⚠️ LiDAR 데이터 가져오기 실패:", error);
         }
       }
 
-      async function fetchCloudPointData() {
-        try {
-          console.log("🔄 Cloud LiDAR 데이터 요청 중...");
-          const response = await fetch(
-            "http://127.0.0.1:8000/cloud_point_data"
-          );
-          console.log("📡 응답 상태 코드:", response.status);
+      function connectWebSocket() {
+        if (cloudSocket && cloudSocket.readyState === WebSocket.OPEN) return console.log("✅ WebSocket이 이미 연결됨");
 
-          const data = await response.json();
-          console.log("✅ 변환된 Cloud 데이터:", data);
+        cloudSocket = new WebSocket("ws://127.0.0.1:8000/ws/cloud_point");
 
-          if (
-            data.latest_cloud_point_xyz_points &&
-            data.latest_cloud_point_xyz_points.length > 0
-          ) {
-            let angle = 0.0;
-            const angleStep = 0.25;
-            const cloudPoints = data.latest_cloud_point_xyz_points.map((p) => {
-              return {
-                x: p.x,
-                y: p.y,
-                z: p.z,
-                distance: p.distance,
-                angle: (angle += angleStep).toFixed(2),
-              };
-            });
-
-            console.log(
-              "📡 변환된 Cloud 포인트 데이터:",
-              cloudPoints.slice(0, 5)
-            );
-
-            cloudChart.data.datasets[0].data = cloudPoints;
-            cloudChart.update();
-            updatePointInfo(cloudPoints, "cloud");
-          } else {
-            console.log("❌ 새로운 Cloud 포인트 데이터가 없습니다.");
+        cloudSocket.onopen = () => console.log("✅ WebSocket 연결 성공");
+        cloudSocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.latest_cloud_point_xyz_points?.length > 0) updateCloudChart(data.latest_cloud_point_xyz_points);
+          } catch (error) {
+            console.error("❌ JSON 파싱 오류:", error);
           }
-        } catch (error) {
-          console.error("⚠️ Cloud LiDAR 데이터 가져오기 실패:", error);
-        }
+        };
+        cloudSocket.onclose = () => {
+          console.warn("❌ WebSocket 연결 종료. 5초 후 재연결...");
+          setTimeout(connectWebSocket, 5000);
+        };
+        cloudSocket.onerror = (error) => console.error("⚠️ WebSocket 오류:", error);
+      }
+
+      function updateCloudChart(points) {
+        if (JSON.stringify(lastCloudData) === JSON.stringify(points)) return;
+        lastCloudData = points;
+        updateChart(cloudChart, points);
+        updatePointInfo(points, "cloud");
+      }
+
+      function updateChart(chartInstance, points) {
+        chartInstance.data.datasets[0].data = points.map((p) => ({ x: p.x, y: p.y }));
+        chartInstance.update();
       }
 
       function resetZoom() {
@@ -325,37 +170,18 @@
       }
 
       function updatePointInfo(points, type) {
-        const infoBoxId =
-          type === "lidar" ? "lidar-point-info" : "cloud-point-info";
+        const infoBoxId = type === "lidar" ? "lidar-point-info" : "cloud-point-info";
         const infoBox = document.getElementById(infoBoxId);
-        infoBox.innerHTML = "";
-
-        points.forEach((point) => {
-          let row = document.createElement("tr");
-
-          let angleCell = document.createElement("td");
-          angleCell.textContent = `${point.angle}°`;
-
-          let xCell = document.createElement("td");
-          xCell.textContent = point.x.toFixed(2);
-
-          let yCell = document.createElement("td");
-          yCell.textContent = point.y.toFixed(2);
-
-          let zCell = document.createElement("td");
-          zCell.textContent = point.z.toFixed(2);
-
-          let distanceCell = document.createElement("td");
-          distanceCell.textContent = point.distance.toFixed(2);
-
-          row.appendChild(angleCell);
-          row.appendChild(xCell);
-          row.appendChild(yCell);
-          row.appendChild(zCell);
-          row.appendChild(distanceCell);
-          infoBox.appendChild(row);
-        });
+        infoBox.innerHTML = points
+          .map((p, i) => `<tr><td>${(i * 0.25).toFixed(2)}°</td><td>${p.x.toFixed(2)}</td><td>${p.y.toFixed(2)}</td><td>${p.z.toFixed(2)}</td><td>${p.distance.toFixed(2)}</td></tr>`)
+          .join("");
       }
+
+      window.onload = function () {
+        console.log("🔄 WebSocket 및 LiDAR 데이터 시작");
+        connectWebSocket();
+        setInterval(fetchLidarData, 5000);
+      };
     </script>
   </body>
 </html>
