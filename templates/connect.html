@@ -60,7 +60,7 @@
       <h2>LiDAR 장치 연결</h2>
       <div class="input-group">
         <label for="ip-input">IP 주소:</label>
-        <input type="text" id="ip-input" placeholder="예: 192.168.123.100" />
+        <input type="text" id="ip-input" placeholder="예: 0.0.0.0" />
       </div>
       <div class="input-group">
         <label for="port-input">포트 번호:</label>
@@ -77,35 +77,29 @@
         const statusMessage = document.getElementById("status-message");
 
         if (!ip || !port) {
-          statusMessage.textContent = "IP 주소와 포트 번호를 입력해주세요.";
+          statusMessage.textContent = "IP와 포트를 입력해주세요.";
           return;
         }
 
         try {
-          console.log(`🔄 연결 시도 중... IP: ${ip}, 포트: ${port}`);
-          const response = await fetch(
-            `http://127.0.0.1:8000/check_connection?ip=${ip}&port=${port}`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-          const data = await response.json();
-          console.log("📡 서버 응답:", data);
+          const response = await fetch("http://127.0.0.1:8000/setup_lidar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip: ip, port: parseInt(port) }),
+          });
 
+          const data = await response.json();
           if (data.status === "success") {
             statusMessage.style.color = "green";
-            statusMessage.textContent = `✅ 연결 성공! (${ip}:${port})`;
-            localStorage.setItem("lidar_ip", ip);
-            localStorage.setItem("lidar_port", port);
-            window.location.href = "/index";
+            statusMessage.textContent = `✅ 연결 성공: ${ip}:${port}`;
+            setTimeout(() => {
+              window.location.href = "/index"; // 성공 시 데이터 페이지로 이동
+            }, 1000);
           } else {
-            statusMessage.textContent = `❌ 연결 실패 ${data.message}`;
+            statusMessage.textContent = `❌ 연결 실패: ${data.detail}`;
           }
         } catch (error) {
-          statusMessage.textContent = `❌ 연결 실패: 서버 응답 없음`;
+          statusMessage.textContent = "❌ 서버 오류";
         }
       }
     </script>
