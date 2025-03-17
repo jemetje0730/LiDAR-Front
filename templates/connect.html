@@ -78,18 +78,6 @@
             const port = document.getElementById("port").value.trim();
             const statusMessage = document.getElementById("status-message");
 
-            // ✅ 입력 검증
-            if (!validateIP(ip)) {
-                statusMessage.textContent = "❌ 올바른 IP 주소를 입력하세요.";
-                statusMessage.style.color = "red";
-                return;
-            }
-            if (!port || isNaN(port) || port < 1 || port > 65535) {
-                statusMessage.textContent = "❌ 유효한 포트 번호를 입력하세요.";
-                statusMessage.style.color = "red";
-                return;
-            }
-
             // ✅ 서버에 연결 요청
             try {
                 const response = await fetch("http://127.0.0.1:8000/connect", {
@@ -115,10 +103,6 @@
             }
         }
 
-        function validateIP(ip) {
-            const ipPattern = /^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}$/;
-            return ipPattern.test(ip);
-        }
     </script>
 </body>
 </html>
