@@ -78,41 +78,36 @@
             const port = document.getElementById("port").value.trim();
             const statusMessage = document.getElementById("status-message");
 
-            // ✅ 입력 검증
-            if (!validateIP(ip)) {
-                statusMessage.textContent = "❌ 올바른 IP 주소를 입력하세요.";
-                statusMessage.style.color = "red";
-                return;
-            }
-            if (!port || isNaN(port) || port < 1 || port > 65535) {
-                statusMessage.textContent = "❌ 유효한 포트 번호를 입력하세요.";
-                statusMessage.style.color = "red";
-                return;
-            }
+        if (!ip || !port) {
+          statusMessage.textContent = "IP 주소와 포트 번호를 입력해주세요.";
+          return;
+        }
 
-            // ✅ 서버에 연결 요청
-            try {
-                const response = await fetch("http://127.0.0.1:8000/connect", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ip, port: parseInt(port) })
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    statusMessage.textContent = `✅ 연결 성공: ${ip}:${port}`;
-                    statusMessage.style.color = "green";
-                    setTimeout(() => {
-                        window.location.href = "/index"; // 연결 성공 시 index.html로 이동
-                    }, 1000);
-                } else {
-                    statusMessage.textContent = `❌ 연결 실패: ${data.message || "알 수 없는 오류"}`;
-                    statusMessage.style.color = "red";
-                }
-            } catch (error) {
-                statusMessage.textContent = "❌ 서버 연결 실패";
-                statusMessage.style.color = "red";
+        try {
+          console.log(`🔄 연결 시도 중... IP: ${ip}, 포트: ${port}`);
+          const response = await fetch(
+            `http://127.0.0.1:8000/check_connection?ip=${ip}&port=${port}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
             }
+          );
+          const data = await response.json();
+          console.log("📡 서버 응답:", data);
+
+          if (data.status === "success") {
+            statusMessage.style.color = "green";
+            statusMessage.textContent = `✅ 연결 성공! (${ip}:${port})`;
+            localStorage.setItem("lidar_ip", ip);
+            localStorage.setItem("lidar_port", port);
+            window.location.href = "/index";
+          } else {
+            statusMessage.textContent = `❌ 연결 실패 ${data.message}`;
+          }
+        } catch (error) {
+          statusMessage.textContent = `❌ 연결 실패: 서버 응답 없음`;
         }
 
         function validateIP(ip) {
