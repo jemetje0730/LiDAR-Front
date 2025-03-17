@@ -2,186 +2,287 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LiDAR 최신 데이터</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
-    <style>
-      .container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      .charts-wrapper {
-        display: flex;
-        justify-content: space-around;
-        gap: 20px;
-        width: 100%;
-        margin-bottom: 40px;
-      }
-      .canvas-wrapper {
-        position: relative;
-        width: 45vw;
-        max-width: 600px;
-      }
-      canvas {
-        width: 100%;
-        height: 100%;
-      }
-      .info-box {
-        width: 300px;
-        height: 400px;
-        overflow-y: auto;
-        border: 1px solid #ccc;
-        padding: 10px;
-        background: #f9f9f9;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+    <title>LiDAR 3D Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+    <!-- 📌 초기화 버튼 추가 -->
+    <button
+      id="reset-btn"
+      style="
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 8px 15px;
+        background: rgba(255, 255, 255, 0.8);
+        border: none;
+        border-radius: 5px;
         font-size: 14px;
+        cursor: pointer;
+      "
+    >
+      초기화
+    </button>
+
+    <script>
+      // 📌 초기 카메라 위치 저장
+      const initialCameraPosition = new THREE.Vector3(0, 0, 20);
+      const initialTarget = new THREE.Vector3(0, 0, 0);
+
+      // 📌 초기화 버튼 클릭 이벤트
+      document.getElementById("reset-btn").addEventListener("click", () => {
+        camera.position.copy(initialCameraPosition);
+        controls.target.copy(initialTarget);
+        controls.update();
+      });
+    </script>
+
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+        color: white;
       }
-      th, td {
-        border: 1px solid #ddd;
-        padding: 6px;
-        text-align: center;
+      #info-box {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        max-height: 300px;
+        overflow-y: auto;
+        color: black;
       }
-      th {
-        background-color: #f2f2f2;
+      .distance-label {
+        position: absolute;
+        color: white;
+        font-size: 12px;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
       }
     </style>
   </head>
+
   <body>
-    <h2>LiDAR 최신 데이터</h2>
-    <button id="zoom-reset-btn" onclick="resetZoom()">줌 초기화</button>
-
-    <div class="container">
-      <div class="charts-wrapper">
-        <div class="canvas-wrapper">
-          <canvas id="lidarChart"></canvas>
-        </div>
-        <div class="info-box">
-          <h3>📌 LiDAR 포인트 정보</h3>
-          <table>
-            <thead>
-              <tr><th>각도(°)</th><th>X</th><th>Y</th><th>Z</th><th>거리(m)</th></tr>
-            </thead>
-            <tbody id="lidar-point-info"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="charts-wrapper">
-        <div class="canvas-wrapper">
-          <canvas id="cloudLidarChart"></canvas>
-        </div>
-        <div class="info-box">
-          <h3>📌 Cloud 포인트 정보</h3>
-          <table>
-            <thead>
-              <tr><th>각도(°)</th><th>X</th><th>Y</th><th>Z</th><th>거리(m)</th></tr>
-            </thead>
-            <tbody id="cloud-point-info"></tbody>
-          </table>
-        </div>
-      </div>
+    <div id="info-box">
+      <h3>📌 거리 데이터</h3>
+      <table id="distance-table" border="1" cellpadding="5"></table>
     </div>
 
     <script>
-      const ctx = document.getElementById("lidarChart").getContext("2d");
-      const cloudCtx = document.getElementById("cloudLidarChart").getContext("2d");
+      // 📌 Shift 키를 누르면 X축으로만 이동
+      let isShiftPressed = false;
+      let isDragging = false;
+      let startX = 0;
 
-      const chart = new Chart(ctx, createChartConfig("blue"));
-      const cloudChart = new Chart(cloudCtx, createChartConfig("red"));
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Shift") {
+          isShiftPressed = true;
+          controls.enableRotate = false; // ✅ 회전 비활성화 (X축 이동만 가능)
+        }
+      });
 
-      let cloudSocket;
-      let lastCloudData = [];
+      window.addEventListener("keyup", (event) => {
+        if (event.key === "Shift") {
+          isShiftPressed = false;
+          controls.enableRotate = true; // ✅ 다시 회전 활성화
+        }
+      });
 
-      function createChartConfig(color) {
-        return {
-          type: "scatter",
-          data: { datasets: [{ label: "LiDAR Points", data: [], borderColor: color, backgroundColor: `${color}80`, pointRadius: 2 }] },
-          options: {
-            maintainAspectRatio: false,
-            responsive: true,
-            aspectRatio: 1,
-            scales: { x: createAxis(), y: createAxis() },
-            plugins: { zoom: { pan: { enabled: true, mode: "xy" }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "xy" } } }
-          }
-        };
-      }
+      window.addEventListener("mousedown", (event) => {
+        if (isShiftPressed) {
+          isDragging = true;
+          startX = event.clientX;
+        }
+      });
 
-      function createAxis() {
-        return {
-          min: -25,
-          max: 25,
-          grid: { color: (ctx) => (ctx.tick.value === 0 ? "black" : "gray"), lineWidth: (ctx) => (ctx.tick.value === 0 ? 2 : 0.5) }
-        };
-      }
+      window.addEventListener("mousemove", (event) => {
+        if (isDragging && isShiftPressed) {
+          const deltaX = (event.clientX - startX) * 0.05;
+          camera.position.x -= deltaX;
+          controls.target.x -= deltaX;
+          startX = event.clientX;
+        }
+      });
 
-      async function fetchLidarData() {
-        try {
-          const response = await fetch("http://127.0.0.1:8000/lidar_data");
-          if (!response.ok) return console.warn("❌ LiDAR 데이터 없음");
-          const data = await response.json();
-          updateChart(chart, data.latest_lidar_xyz_points || []);
-          updatePointInfo(data.latest_lidar_xyz_points || [], "lidar");
-        } catch (error) {
-          console.error("⚠️ LiDAR 데이터 가져오기 실패:", error);
+      window.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+    </script>
+
+    <script>
+      // 🌟 Three.js 3D 환경 설정
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // 📌 XYZ 축 추가 (1m 크기)
+      scene.add(new THREE.AxesHelper(1));
+
+      // 📌 거리 원 및 정확히 겹치는 격자 추가
+      const distanceLabels = [];
+      function createDistanceCirclesWithGrid() {
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.top = "0";
+        container.style.left = "0";
+        container.style.pointerEvents = "none";
+        document.body.appendChild(container);
+
+        for (let i = 1; i <= 20; i++) {
+          createCircle(i);
+          createGrid(i);
+
+          // 📌 거리 라벨 추가
+          const label = document.createElement("div");
+          label.className = "distance-label";
+          label.innerText = `${i}m`;
+          container.appendChild(label);
+          distanceLabels.push({ element: label, distance: i });
         }
       }
 
-      function connectWebSocket() {
-        if (cloudSocket && cloudSocket.readyState === WebSocket.OPEN) return console.log("✅ WebSocket이 이미 연결됨");
-
-        cloudSocket = new WebSocket("ws://127.0.0.1:8000/ws/cloud_point");
-
-        cloudSocket.onopen = () => console.log("✅ WebSocket 연결 성공");
-        cloudSocket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.latest_cloud_point_xyz_points?.length > 0) updateCloudChart(data.latest_cloud_point_xyz_points);
-          } catch (error) {
-            console.error("❌ JSON 파싱 오류:", error);
-          }
-        };
-        cloudSocket.onclose = () => {
-          console.warn("❌ WebSocket 연결 종료. 5초 후 재연결...");
-          setTimeout(connectWebSocket, 5000);
-        };
-        cloudSocket.onerror = (error) => console.error("⚠️ WebSocket 오류:", error);
+      // 📌 거리 원 생성 (1m ~ 20m)
+      function createCircle(radius) {
+        const points = [];
+        for (let j = 0; j <= 64; j++) {
+          const angle = (j / 64) * Math.PI * 2;
+          points.push(
+            new THREE.Vector3(
+              Math.cos(angle) * radius,
+              0,
+              Math.sin(angle) * radius
+            )
+          );
+        }
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          linewidth: 1,
+        }); // ✅ 흰색 원 유지
+        const circle = new THREE.LineLoop(geometry, material);
+        circle.rotation.x = -Math.PI / 2;
+        scene.add(circle);
       }
 
-      function updateCloudChart(points) {
-        if (JSON.stringify(lastCloudData) === JSON.stringify(points)) return;
-        lastCloudData = points;
-        updateChart(cloudChart, points);
-        updatePointInfo(points, "cloud");
+      // 📌 원과 정확히 겹치는 격자 생성
+      function createGrid(size) {
+        const gridColor = 0x444444;
+        const gridHelper = new THREE.GridHelper(
+          size * 2,
+          size * 2,
+          gridColor,
+          gridColor
+        );
+        gridHelper.rotation.x = -Math.PI / 2;
+        scene.add(gridHelper);
       }
 
-      function updateChart(chartInstance, points) {
-        chartInstance.data.datasets[0].data = points.map((p) => ({ x: p.x, y: p.y }));
-        chartInstance.update();
+      createDistanceCirclesWithGrid(); // ✅ 거리 원과 정확히 겹치는 격자 추가
+
+      // 📌 거리 라벨 위치 업데이트
+      function updateDistanceLabels() {
+        distanceLabels.forEach((label) => {
+          const pos = new THREE.Vector3(label.distance, 0, 0); // ✅ 각 원의 X축 방향 위치
+          pos.project(camera);
+
+          const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+          const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+
+          label.element.style.left = `${x}px`;
+          label.element.style.top = `${y}px`;
+        });
       }
 
-      function resetZoom() {
-        chart.resetZoom();
-        cloudChart.resetZoom();
+      // 📌 카메라 컨트롤 추가
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      // ✅ 카메라를 정면에서 보도록 설정
+      camera.position.set(0, 0, 20); // X: 0, Y: 0, Z: 20 (앞에서 정면으로 바라봄)
+      camera.up.set(0, 1, 0); // Y축이 위를 향하도록 설정 (기본값)
+      controls.target.set(0, 0, 0); // (0,0,0)을 정중앙으로 바라보게 설정
+      controls.update(); // 컨트롤 업데이트
+
+      // 📌 LiDAR 포인트 클라우드 최적화
+      let pointCloud, geometry, positions;
+      function updatePointCloud(lidarData) {
+        if (!lidarData || lidarData.length === 0) return;
+
+        const vertices = new Float32Array(lidarData.length * 3);
+        lidarData.forEach((point, i) => {
+          vertices[i * 3] = point.x;
+          vertices[i * 3 + 1] = point.y;
+          vertices[i * 3 + 2] = point.z;
+        });
+
+        if (!pointCloud) {
+          geometry = new THREE.BufferGeometry();
+          positions = new THREE.Float32BufferAttribute(vertices, 3);
+          geometry.setAttribute("position", positions);
+          const material = new THREE.PointsMaterial({
+            color: 0xff0000,
+            size: 0.05,
+          });
+          pointCloud = new THREE.Points(geometry, material);
+          scene.add(pointCloud);
+        } else {
+          positions.copyArray(vertices);
+          positions.needsUpdate = true;
+        }
       }
 
-      function updatePointInfo(points, type) {
-        const infoBoxId = type === "lidar" ? "lidar-point-info" : "cloud-point-info";
-        const infoBox = document.getElementById(infoBoxId);
-        infoBox.innerHTML = points
-          .map((p, i) => `<tr><td>${(i * 0.25).toFixed(2)}°</td><td>${p.x.toFixed(2)}</td><td>${p.y.toFixed(2)}</td><td>${p.z.toFixed(2)}</td><td>${p.distance.toFixed(2)}</td></tr>`)
-          .join("");
+      // 📌 거리 데이터 테이블 업데이트
+      function updateDistanceTable(lidarData) {
+        const table = document.getElementById("distance-table");
+        let html = "<tr><th>각도(°)</th><th>거리(m)</th></tr>";
+        lidarData.forEach((point, index) => {
+          html += `<tr><td>${(index * 0.25).toFixed(
+            2
+          )}</td><td>${point.distance.toFixed(2)}</td></tr>`;
+        });
+        table.innerHTML = html;
       }
 
-      window.onload = function () {
-        console.log("🔄 WebSocket 및 LiDAR 데이터 시작");
-        connectWebSocket();
-        setInterval(fetchLidarData, 5000);
+      // 📌 WebSocket 설정 및 데이터 최적화
+      let ws = new WebSocket("ws://127.0.0.1:8000/ws/cloud_point");
+      let lastUpdate = Date.now();
+      let lastData = null;
+
+      ws.onmessage = (event) => {
+        const now = Date.now();
+        if (now - lastUpdate < 100) return;
+        lastUpdate = now;
+
+        const data = JSON.parse(event.data);
+        if (
+          JSON.stringify(data.latest_cloud_point_xyz_points) ===
+          JSON.stringify(lastData)
+        )
+          return;
+        lastData = data.latest_cloud_point_xyz_points;
+
+        if (data.latest_cloud_point_xyz_points) {
+          updatePointCloud(data.latest_cloud_point_xyz_points);
+          updateDistanceTable(data.latest_cloud_point_xyz_points);
+        }
       };
+
+      // 📌 애니메이션 루프
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        updateDistanceLabels(); // ✅ 거리 라벨 위치 업데이트
+        renderer.render(scene, camera);
+      }
+      animate();
     </script>
   </body>
 </html>
