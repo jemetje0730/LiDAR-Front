@@ -125,8 +125,11 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
-      // 📌 XYZ 축 추가 (1m 크기)
-      scene.add(new THREE.AxesHelper(1));
+      // 📌 XYZ 축 추가 (1m 크기) - Grid에 가려지지 않도록 설정
+      const axesHelper = new THREE.AxesHelper(1);
+      axesHelper.renderOrder = 1; // ✅ GridHelper보다 위에 렌더링
+      axesHelper.material.depthTest = false; // ✅ Grid에 가려지지 않도록 설정
+      scene.add(axesHelper);
 
       // 📌 거리 원 및 정확히 겹치는 격자 추가
       const distanceLabels = [];
