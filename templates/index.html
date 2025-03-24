@@ -5,10 +5,13 @@
     <title>LiDAR 3D Viewer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
-    <!-- 📌 초기화 버튼 추가 -->
-    <button
-      id="reset-btn"
-      style="
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+      }
+      #reset-btn {
         position: absolute;
         top: 10px;
         right: 10px;
@@ -18,30 +21,6 @@
         border-radius: 5px;
         font-size: 14px;
         cursor: pointer;
-      "
-    >
-      초기화
-    </button>
-
-    <script>
-      // 📌 초기 카메라 위치 저장
-      const initialCameraPosition = new THREE.Vector3(0, 0, 20);
-      const initialTarget = new THREE.Vector3(0, 0, 0);
-
-      // 📌 초기화 버튼 클릭 이벤트
-      document.getElementById("reset-btn").addEventListener("click", () => {
-        camera.position.copy(initialCameraPosition);
-        controls.target.copy(initialTarget);
-        controls.update();
-      });
-    </script>
-
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-        color: white;
       }
       #info-box {
         position: absolute;
@@ -59,61 +38,46 @@
         position: absolute;
         color: white;
         font-size: 12px;
-        transform: translate(-50%, -50%);
+        font-weight: bold;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 2px 5px;
+        border-radius: 3px;
         pointer-events: none;
+        transform: translate(-50%, -50%);
       }
     </style>
   </head>
 
   <body>
+    <button id="reset-btn">줌 초기화</button>
     <div id="info-box">
-      <h3>📌 거리 데이터</h3>
-      <table id="distance-table" border="1" cellpadding="5"></table>
+      <h3>📌 LiDAR 거리 데이터</h3>
+      <table id="distance-table" border="1" cellpadding="5">
+        <tr>
+          <th>#</th>
+          <th>각도 (°)</th>
+          <th>채널 0 (m)</th>
+          <th>채널 1 (m)</th>
+          <th>채널 2 (m)</th>
+          <th>채널 3 (m)</th>
+        </tr>
+      </table>
     </div>
 
     <script>
-      // 📌 Shift 키를 누르면 X축으로만 이동
-      let isShiftPressed = false;
-      let isDragging = false;
-      let startX = 0;
+      // 📌 초기 카메라 위치 저장
+      const initialCameraPosition = new THREE.Vector3(0, 0, 20);
+      const initialTarget = new THREE.Vector3(0, 0, 0);
 
-      window.addEventListener("keydown", (event) => {
-        if (event.key === "Shift") {
-          isShiftPressed = true;
-          controls.enableRotate = false; // ✅ 회전 비활성화 (X축 이동만 가능)
-        }
-      });
-
-      window.addEventListener("keyup", (event) => {
-        if (event.key === "Shift") {
-          isShiftPressed = false;
-          controls.enableRotate = true; // ✅ 다시 회전 활성화
-        }
-      });
-
-      window.addEventListener("mousedown", (event) => {
-        if (isShiftPressed) {
-          isDragging = true;
-          startX = event.clientX;
-        }
-      });
-
-      window.addEventListener("mousemove", (event) => {
-        if (isDragging && isShiftPressed) {
-          const deltaX = (event.clientX - startX) * 0.05;
-          camera.position.x -= deltaX;
-          controls.target.x -= deltaX;
-          startX = event.clientX;
-        }
-      });
-
-      window.addEventListener("mouseup", () => {
-        isDragging = false;
+      // 📌 초기화 버튼 클릭 이벤트
+      document.getElementById("reset-btn").addEventListener("click", () => {
+        camera.position.copy(initialCameraPosition);
+        controls.target.copy(initialTarget);
+        controls.update();
       });
     </script>
 
     <script>
-      // 🌟 Three.js 3D 환경 설정
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(
         75,
@@ -121,81 +85,50 @@
         0.1,
         1000
       );
+
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
-      // 📌 XYZ 축 추가 (1m 크기) - Grid에 가려지지 않도록 설정
-      const axesHelper = new THREE.AxesHelper(1);
-      axesHelper.renderOrder = 1; // ✅ GridHelper보다 위에 렌더링
-      axesHelper.material.depthTest = false; // ✅ Grid에 가려지지 않도록 설정
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableZoom = true;
+      controls.enablePan = true;
+
+      const axesHelper = new THREE.AxesHelper(3);
+      axesHelper.renderOrder = 1;
+      axesHelper.material.depthTest = false;
       scene.add(axesHelper);
 
-      // 📌 거리 원 및 정확히 겹치는 격자 추가
+      camera.position.set(0, 0, 20);
+      camera.lookAt(0, 0, 0);
+      controls.update();
+
       const distanceLabels = [];
-      function createDistanceCirclesWithGrid() {
-        const container = document.createElement("div");
-        container.style.position = "absolute";
-        container.style.top = "0";
-        container.style.left = "0";
-        container.style.pointerEvents = "none";
-        document.body.appendChild(container);
-
+      function createDistanceCirclesWithLabels() {
         for (let i = 1; i <= 20; i++) {
-          createCircle(i);
-          createGrid(i);
+          const points = [];
+          for (let j = 0; j <= 64; j++) {
+            const angle = (j / 64) * Math.PI * 2;
+            points.push(
+              new THREE.Vector3(Math.cos(angle) * i, Math.sin(angle) * i, 0)
+            );
+          }
+          const geometry = new THREE.BufferGeometry().setFromPoints(points);
+          const material = new THREE.LineBasicMaterial({ color: 0x444444 });
+          const circle = new THREE.LineLoop(geometry, material);
+          scene.add(circle);
 
-          // 📌 거리 라벨 추가
           const label = document.createElement("div");
           label.className = "distance-label";
           label.innerText = `${i}m`;
-          container.appendChild(label);
+          document.body.appendChild(label);
           distanceLabels.push({ element: label, distance: i });
         }
       }
 
-      // 📌 거리 원 생성 (1m ~ 20m)
-      function createCircle(radius) {
-        const points = [];
-        for (let j = 0; j <= 64; j++) {
-          const angle = (j / 64) * Math.PI * 2;
-          points.push(
-            new THREE.Vector3(
-              Math.cos(angle) * radius,
-              0,
-              Math.sin(angle) * radius
-            )
-          );
-        }
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({
-          color: 0xffffff,
-          linewidth: 1,
-        }); // ✅ 흰색 원 유지
-        const circle = new THREE.LineLoop(geometry, material);
-        circle.rotation.x = -Math.PI / 2;
-        scene.add(circle);
-      }
-
-      // 📌 원과 정확히 겹치는 격자 생성
-      function createGrid(size) {
-        const gridColor = 0x444444;
-        const gridHelper = new THREE.GridHelper(
-          size * 2,
-          size * 2,
-          gridColor,
-          gridColor
-        );
-        gridHelper.rotation.x = -Math.PI / 2;
-        scene.add(gridHelper);
-      }
-
-      createDistanceCirclesWithGrid(); // ✅ 거리 원과 정확히 겹치는 격자 추가
-
-      // 📌 거리 라벨 위치 업데이트
       function updateDistanceLabels() {
         distanceLabels.forEach((label) => {
-          const pos = new THREE.Vector3(label.distance, 0, 0); // ✅ 각 원의 X축 방향 위치
+          const pos = new THREE.Vector3(label.distance, 0, 0);
           pos.project(camera);
 
           const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
@@ -206,86 +139,121 @@
         });
       }
 
-      // 📌 카메라 컨트롤 추가
-      const controls = new THREE.OrbitControls(camera, renderer.domElement);
-      // ✅ 카메라를 정면에서 보도록 설정
-      camera.position.set(0, 0, 20); // X: 0, Y: 0, Z: 20 (앞에서 정면으로 바라봄)
-      camera.up.set(0, 1, 0); // Y축이 위를 향하도록 설정 (기본값)
-      controls.target.set(0, 0, 0); // (0,0,0)을 정중앙으로 바라보게 설정
-      controls.update(); // 컨트롤 업데이트
+      function createGrid(size) {
+        const gridHelper = new THREE.GridHelper(
+          size * 2,
+          size * 2,
+          0x333333,
+          0x333333
+        );
+        gridHelper.rotation.x = Math.PI / 2;
+        scene.add(gridHelper);
+      }
 
-      // 📌 LiDAR 포인트 클라우드 최적화
-      let pointCloud, geometry, positions;
-      function updatePointCloud(lidarData) {
-        if (!lidarData || lidarData.length === 0) return;
+      createDistanceCirclesWithLabels();
+      createGrid(20);
 
-        const vertices = new Float32Array(lidarData.length * 3);
-        lidarData.forEach((point, i) => {
-          vertices[i * 3] = point.x;
-          vertices[i * 3 + 1] = point.y;
-          vertices[i * 3 + 2] = point.z;
-        });
+      let pointClouds = {};
+      const channelColors = [0xff0000, 0x0000ff, 0x00ff00, 0xffa500];
+      const verticalAngles = [-1.07, 0, 1.07, 2];
 
-        if (!pointCloud) {
-          geometry = new THREE.BufferGeometry();
-          positions = new THREE.Float32BufferAttribute(vertices, 3);
-          geometry.setAttribute("position", positions);
+      function initPointClouds(channelCount) {
+        for (let i = 0; i < channelCount; i++) {
+          const geometry = new THREE.BufferGeometry();
           const material = new THREE.PointsMaterial({
-            color: 0xff0000,
-            size: 0.05,
+            color: channelColors[i % 4],
+            size: 0.05, // ✅ 포인트 크기 조정
+            transparent: true,
+            opacity: 0.9,
           });
-          pointCloud = new THREE.Points(geometry, material);
-          scene.add(pointCloud);
-        } else {
-          positions.copyArray(vertices);
-          positions.needsUpdate = true;
+
+          pointClouds[i] = new THREE.Points(geometry, material);
+          scene.add(pointClouds[i]);
+
+          console.log(`✅ 채널 ${i} 포인트 클라우드 추가됨`); // ✅ 추가 확인 로그
         }
       }
 
-      // 📌 거리 데이터 테이블 업데이트
-      function updateDistanceTable(lidarData) {
-        const table = document.getElementById("distance-table");
-        let html = "<tr><th>각도(°)</th><th>거리(m)</th></tr>";
-        lidarData.forEach((point, index) => {
-          html += `<tr><td>${(index * 0.25).toFixed(
-            2
-          )}</td><td>${point.distance.toFixed(2)}</td></tr>`;
-        });
+      // ✅ LiDAR 포인트 클라우드 업데이트 함수 수정
+      let ws = new WebSocket("ws://127.0.0.1:8000/ws/lidar");
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (!data.lidar_data || !data.distances) return;
+
+        console.log("📡 WebSocket 데이터 수신:", data);
+
+        updatePointCloud(data.lidar_data, 4);
+        updateDistanceTable(data.distances); // ✅ 거리 테이블도 업데이트
+      };
+
+      function updatePointCloud(lidarData, channelCount) {
+        const angleOffset = Math.PI / 4; // 45도(π/4) 반시계 회전
+
+        for (let i = 0; i < channelCount; i++) {
+          if (lidarData[i] && lidarData[i].length > 0) {
+            const points = lidarData[i].map((p) => {
+              const x =
+                p.x * Math.cos(angleOffset) - p.y * Math.sin(angleOffset);
+              const y =
+                p.x * Math.sin(angleOffset) + p.y * Math.cos(angleOffset);
+              return new THREE.Vector3(x, y, p.z);
+            });
+
+            if (pointClouds[i].geometry) {
+              pointClouds[i].geometry.dispose();
+            }
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            pointClouds[i].geometry = geometry;
+          }
+        }
+      }
+
+      function updateDistanceTable(distances) {
+        let table = document.getElementById("distance-table");
+        let html = `<tr>
+          <th>#</th>
+          <th>각도 (°)</th>
+          <th>채널 0 (m)</th>
+          <th>채널 1 (m)</th>
+          <th>채널 2 (m)</th>
+          <th>채널 3 (m)</th>
+      </tr>`;
+
+        for (let i = 0; i < 400; i++) {
+          // ✅ 각도 400개 기준으로 업데이트
+          const angle = (i * 0.25).toFixed(2);
+
+          // ✅ 거리 값 처리 (최대 50m 제한 & 소수 둘째 자리까지 표시)
+          const formatDistance = (d) =>
+            d !== undefined ? Math.min(50, parseFloat(d)).toFixed(2) : "-";
+
+          const dist0 = formatDistance(distances[0]?.[i]?.distance);
+          const dist1 = formatDistance(distances[1]?.[i]?.distance);
+          const dist2 = formatDistance(distances[2]?.[i]?.distance);
+          const dist3 = formatDistance(distances[3]?.[i]?.distance);
+
+          html += `<tr>
+          <td>${i}</td>
+          <td>${angle}</td>
+          <td>${dist0}</td>
+          <td>${dist1}</td>
+          <td>${dist2}</td>
+          <td>${dist3}</td>
+      </tr>`;
+        }
         table.innerHTML = html;
       }
 
-      // 📌 WebSocket 설정 및 데이터 최적화
-      let ws = new WebSocket("ws://127.0.0.1:8000/ws/cloud_point");
-      let lastUpdate = Date.now();
-      let lastData = null;
-
-      ws.onmessage = (event) => {
-        const now = Date.now();
-        if (now - lastUpdate < 100) return;
-        lastUpdate = now;
-
-        const data = JSON.parse(event.data);
-        if (
-          JSON.stringify(data.latest_cloud_point_xyz_points) ===
-          JSON.stringify(lastData)
-        )
-          return;
-        lastData = data.latest_cloud_point_xyz_points;
-
-        if (data.latest_cloud_point_xyz_points) {
-          updatePointCloud(data.latest_cloud_point_xyz_points);
-          updateDistanceTable(data.latest_cloud_point_xyz_points);
-        }
-      };
-
-      // 📌 애니메이션 루프
       function animate() {
         requestAnimationFrame(animate);
         controls.update();
-        updateDistanceLabels(); // ✅ 거리 라벨 위치 업데이트
         renderer.render(scene, camera);
+        updateDistanceLabels();
       }
       animate();
+      initPointClouds(4);
     </script>
   </body>
 </html>
