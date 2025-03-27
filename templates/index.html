@@ -11,6 +11,44 @@
         overflow: hidden;
         font-family: Arial, sans-serif;
       }
+      /* 사이드바 스타일 */
+      #sidebar {
+        position: absolute;
+        left: -280px; /* 기본적으로 숨김 */
+        top: 0;
+        width: 280px;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        padding: 15px;
+        transition: left 0.3s ease-in-out;
+        color: white;
+        overflow-y: auto;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+      }
+      #sidebar.show {
+        left: 0;
+      }
+      #menu-btn {
+        position: absolute;
+        top: 10px;
+        left: 40px;
+        padding: 8px 15px;
+        background: rgba(255, 255, 255, 0.8);
+        border: none;
+        border-radius: 5px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      #close-btn {
+        display: block;
+        margin-top: 15px;
+        padding: 8px 15px;
+        background: rgba(255, 255, 255, 0.8);
+        border: none;
+        border-radius: 5px;
+        font-size: 14px;
+        cursor: pointer;
+      }
       #reset-btn {
         position: absolute;
         top: 10px;
@@ -23,9 +61,6 @@
         cursor: pointer;
       }
       #info-box {
-        position: absolute;
-        top: 10px;
-        left: 10px;
         background: rgba(255, 255, 255, 0.8);
         padding: 10px;
         border-radius: 5px;
@@ -34,35 +69,643 @@
         overflow-y: auto;
         color: black;
       }
-      .distance-label {
-        position: absolute;
-        color: white;
-        font-size: 12px;
-        font-weight: bold;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 2px 5px;
-        border-radius: 3px;
-        pointer-events: none;
-        transform: translate(-50%, -50%);
+      #distance-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      #distance-table th,
+      #distance-table td {
+        border: 1px solid #ddd;
+        padding: 5px;
+        text-align: center;
       }
     </style>
   </head>
 
   <body>
+    <button id="menu-btn">☰</button>
     <button id="reset-btn">줌 초기화</button>
-    <div id="info-box">
+
+    <!-- ✅ 사이드바 -->
+    <div id="sidebar">
+      <h3>📌 LiDAR 설정</h3>
+      <button id="close-btn">닫기</button>
+
       <h3>📌 LiDAR 거리 데이터</h3>
-      <table id="distance-table" border="1" cellpadding="5">
-        <tr>
-          <th>#</th>
-          <th>각도 (°)</th>
-          <th>채널 0 (m)</th>
-          <th>채널 1 (m)</th>
-          <th>채널 2 (m)</th>
-          <th>채널 3 (m)</th>
-        </tr>
-      </table>
+      <div id="info-box">
+        <table id="distance-table">
+          <tr>
+            <th>#</th>
+            <th>각도 (°)</th>
+            <th>채널 1 (m)</th>
+            <th>채널 2 (m)</th>
+            <th>채널 3 (m)</th>
+            <th>채널 4 (m)</th>
+          </tr>
+        </table>
+      </div>
+
+      <h3>📌 GetConfig</h3>
+      <button
+        id="outputChannelBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.8);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        Output Channel
+      </button>
+
+      <!-- Output Channel 옵션 -->
+      <div
+        id="outputChannelOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label style="color: black; display: block; padding: 5px 0">
+          <input type="checkbox" name="outputChannel" value="CH1" /> CH1
+        </label>
+        <label style="color: black; display: block; padding: 5px 0">
+          <input type="checkbox" name="outputChannel" value="CH2" /> CH2
+        </label>
+        <label style="color: black; display: block; padding: 5px 0">
+          <input type="checkbox" name="outputChannel" value="CH3" /> CH3
+        </label>
+        <label style="color: black; display: block; padding: 5px 0">
+          <input type="checkbox" name="outputChannel" value="CH4" /> CH4
+        </label>
+        <button
+          id="setOutputChannel"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
+      </div>
+
+      <!-- Self Check Active State 버튼 -->
+      <button
+        id="selfCheckBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.8);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        Self Check Active State
+      </button>
+
+      <!-- Low / High 옵션 창 -->
+      <div
+        id="selfCheckOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label style="color: black; display: block; padding: 5px 0">
+          <input type="radio" name="selfCheck" value="Low" /> Low
+        </label>
+        <label style="color: black; display: block; padding: 5px 0">
+          <input type="radio" name="selfCheck" value="High" /> High
+        </label>
+        <button
+          id="setSelfCheck"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
+      </div>
+      <button
+        id="pulseDataBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.8);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        Pulse Data
+      </button>
+
+      <!-- Pulse Data 설정 옵션 -->
+      <div
+        id="pulseDataOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label
+          for="pulseDataValue"
+          style="color: black; display: block; padding: 5px 0"
+          >Pulse Value (0-1000ms):</label
+        >
+        <input
+          type="range"
+          id="pulseDataValue"
+          min="0"
+          max="1000"
+          step="100"
+          value="0"
+          style="width: 100%"
+        />
+        <span
+          id="pulseDataValueLabel"
+          style="display: block; text-align: center"
+          >0</span
+        >
+
+        <button
+          id="setPulseData"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
+      </div>
+
+      <button
+        id="angleDataBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.8);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        Angle Data
+      </button>
+
+      <!-- Angle Data 설정 옵션 -->
+      <div
+        id="angleDataOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label
+          for="angleDataValue"
+          style="color: black; display: block; padding: 5px 0"
+          >Angle Value (0-100°):</label
+        >
+        <input
+          type="range"
+          id="angleDataValue"
+          min="0"
+          max="100"
+          step="1"
+          value="0"
+          style="width: 100%"
+        />
+        <span
+          id="angleDataValueLabel"
+          style="display: block; text-align: center"
+          >0°</span
+        >
+
+        <button
+          id="setAngleData"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
+      </div>
+      <button
+        id="distanceRangeBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.8);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        Distance Range
+      </button>
+
+      <!-- Distance Range 설정 옵션 -->
+      <div
+        id="distanceRangeOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label
+          for="distanceRangeValue"
+          style="color: black; display: block; padding: 5px 0"
+          >Distance Value (0-50m):</label
+        >
+        <input
+          type="range"
+          id="distanceRangeValue"
+          min="0"
+          max="50"
+          step="1"
+          value="0"
+          style="width: 100%"
+        />
+        <span
+          id="distanceRangeValueLabel"
+          style="display: block; text-align: center"
+          >0m</span
+        >
+
+        <button
+          id="setDistanceRange"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
+      </div>
+      <button
+        id="areaDataBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.8);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        Area Data
+      </button>
+
+      <!-- Area Data 설정 옵션 -->
+      <div
+        id="areaDataOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label
+          for="areaDataValue"
+          style="color: black; display: block; padding: 5px 0"
+          >Area Size (0-255cm):</label
+        >
+        <input
+          type="range"
+          id="areaDataValue"
+          min="0"
+          max="255"
+          step="1"
+          value="0"
+          style="width: 100%"
+        />
+        <span id="areaDataValueLabel" style="display: block; text-align: center"
+          >0cm</span 
+        >
+
+        <button
+          id="setAreaData"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
+      </div>
     </div>
+
+    <script>
+      // ✅ 사이드바 토글 기능
+      const menuBtn = document.getElementById("menu-btn");
+      const sidebar = document.getElementById("sidebar");
+      const closeBtn = document.getElementById("close-btn");
+
+      menuBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("show");
+      });
+
+      closeBtn.addEventListener("click", () => {
+        sidebar.classList.remove("show");
+      });
+      document.getElementById("getConfigBtn").addEventListener("click", () => {
+        const selectedConfig = document.getElementById("configType").value;
+        fetch("http://127.0.0.1:8000/get_config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config_type: selectedConfig }),
+        })
+          .then((response) => response.json())
+          .then((data) => console.log("LiDAR Response:", data))
+          .catch((error) => console.error("Error:", error));
+      });
+    </script>
+
+    <script>
+      // Area Data 버튼 클릭 시 설정 옵션 토글
+      document.getElementById("areaDataBtn").addEventListener("click", () => {
+        const options = document.getElementById("areaDataOptions");
+        options.style.display =
+          options.style.display === "none" ? "block" : "none";
+      });
+
+      // Area Size 범위 값 표시 업데이트
+      document
+        .getElementById("areaDataValue")
+        .addEventListener("input", (event) => {
+          const value = event.target.value;
+          document.getElementById("areaDataValueLabel").innerText =
+            value + "cm";
+        });
+
+      // Area Data 설정 버튼 클릭 시 서버로 값 전송
+      document.getElementById("setAreaData").addEventListener("click", () => {
+        const areaValue = document.getElementById("areaDataValue").value;
+
+        alert(`Area Data 설정: ${areaValue}cm`);
+
+        // 서버로 Area Data 값 전송 (예제 API 호출)
+        fetch("http://127.0.0.1:8000/set_area_data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ area_data: parseInt(areaValue) }),
+        })
+          .then((response) => response.json())
+          .then((data) => console.log("Area Data 설정 완료:", data))
+          .catch((error) => console.error("설정 오류:", error));
+      });
+    </script>
+
+    <script>
+      // Distance Range 버튼 클릭 시 설정 옵션 토글
+      document
+        .getElementById("distanceRangeBtn")
+        .addEventListener("click", () => {
+          const options = document.getElementById("distanceRangeOptions");
+          options.style.display =
+            options.style.display === "none" ? "block" : "none";
+        });
+
+      // Distance Value 범위 값 표시 업데이트
+      document
+        .getElementById("distanceRangeValue")
+        .addEventListener("input", (event) => {
+          const value = event.target.value;
+          document.getElementById("distanceRangeValueLabel").innerText =
+            value + "m";
+        });
+
+      // Distance Range 설정 버튼 클릭 시 서버로 값 전송
+      document
+        .getElementById("setDistanceRange")
+        .addEventListener("click", () => {
+          const distanceValue =
+            document.getElementById("distanceRangeValue").value;
+
+          alert(`Distance Range 설정: ${distanceValue}m`);
+
+          // 서버로 Distance Range 값 전송 (예제 API 호출)
+          fetch("http://127.0.0.1:8000/set_distance_range", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ distance_range: parseInt(distanceValue) }),
+          })
+            .then((response) => response.json())
+            .then((data) => console.log("Distance Range 설정 완료:", data))
+            .catch((error) => console.error("설정 오류:", error));
+        });
+    </script>
+
+    <script>
+      // Pulse Data 버튼 클릭 시 설정 옵션 토글
+      document.getElementById("pulseDataBtn").addEventListener("click", () => {
+        const options = document.getElementById("pulseDataOptions");
+        options.style.display =
+          options.style.display === "none" ? "block" : "none";
+      });
+
+      // Pulse Value 범위 값 표시 업데이트
+      document
+        .getElementById("pulseDataValue")
+        .addEventListener("input", (event) => {
+          const value = event.target.value;
+          document.getElementById("pulseDataValueLabel").innerText = value;
+        });
+
+      // Pulse Data 설정 버튼 클릭 시 서버로 값 전송
+      document.getElementById("setPulseData").addEventListener("click", () => {
+        const pulseValue = document.getElementById("pulseDataValue").value;
+
+        alert(`Pulse Data 설정: ${pulseValue}`);
+
+        // 서버로 Pulse Data 값 전송 (예제 API 호출)
+        fetch("http://127.0.0.1:8000/set_pulse_data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pulse_data: parseInt(pulseValue) }),
+        })
+          .then((response) => response.json())
+          .then((data) => console.log("Pulse Data 설정 완료:", data))
+          .catch((error) => console.error("설정 오류:", error));
+      });
+    </script>
+
+    <script>
+      // Angle Data 버튼 클릭 시 설정 옵션 토글
+      document.getElementById("angleDataBtn").addEventListener("click", () => {
+        const options = document.getElementById("angleDataOptions");
+        options.style.display =
+          options.style.display === "none" ? "block" : "none";
+      });
+
+      // Angle Value 범위 값 표시 업데이트
+      document
+        .getElementById("angleDataValue")
+        .addEventListener("input", (event) => {
+          const value = event.target.value;
+          document.getElementById("angleDataValueLabel").innerText =
+            value + "°";
+        });
+
+      // Angle Data 설정 버튼 클릭 시 서버로 값 전송
+      document.getElementById("setAngleData").addEventListener("click", () => {
+        const angleValue = document.getElementById("angleDataValue").value;
+
+        alert(`Angle Data 설정: ${angleValue}°`);
+
+        // 서버로 Angle Data 값 전송 (예제 API 호출)
+        fetch("http://127.0.0.1:8000/set_angle_data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ angle_data: parseInt(angleValue) }),
+        })
+          .then((response) => response.json())
+          .then((data) => console.log("Angle Data 설정 완료:", data))
+          .catch((error) => console.error("설정 오류:", error));
+      });
+    </script>
+
+    <script>
+      document
+        .getElementById("outputChannelBtn")
+        .addEventListener("click", () => {
+          const options = document.getElementById("outputChannelOptions");
+          options.style.display =
+            options.style.display === "none" ? "block" : "none";
+        });
+
+      document
+        .getElementById("setOutputChannel")
+        .addEventListener("click", () => {
+          const selectedChannels = Array.from(
+            document.querySelectorAll("input[name='outputChannel']:checked")
+          ).map((el) => el.value);
+
+          if (selectedChannels.length > 0) {
+            alert(`Output Channel 설정: ${selectedChannels.join(", ")}`);
+            document.getElementById("outputChannelOptions").style.display =
+              "none";
+
+            // 서버로 설정값 전송 (예제 API 호출)
+            fetch("http://127.0.0.1:8000/set_output_channel", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ channels: selectedChannels }),
+            })
+              .then((response) => response.json())
+              .then((data) => console.log("설정 완료:", data))
+              .catch((error) => console.error("설정 오류:", error));
+          } else {
+            alert("최소 하나의 채널을 선택하세요.");
+          }
+        });
+    </script>
+
+    <script>
+      document.getElementById("selfCheckBtn").addEventListener("click", () => {
+        const options = document.getElementById("selfCheckOptions");
+        options.style.display =
+          options.style.display === "none" ? "block" : "none";
+      });
+
+      document.getElementById("setSelfCheck").addEventListener("click", () => {
+        const selectedOption = document.querySelector(
+          "input[name='selfCheck']:checked"
+        );
+        if (selectedOption) {
+          alert(`Self Check Active State 설정: ${selectedOption.value}`);
+          document.getElementById("selfCheckOptions").style.display = "none";
+
+          // 서버로 설정값 전송 (예제 API 호출)
+          fetch("http://127.0.0.1:8000/set_self_check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ state: selectedOption.value }),
+          })
+            .then((response) => response.json())
+            .then((data) => console.log("설정 완료:", data))
+            .catch((error) => console.error("설정 오류:", error));
+        } else {
+          alert("옵션을 선택하세요.");
+        }
+      });
+    </script>
 
     <script>
       // 📌 초기 카메라 위치 저장
@@ -94,7 +737,7 @@
       controls.enableZoom = true;
       controls.enablePan = true;
 
-      const axesHelper = new THREE.AxesHelper(3);
+      const axesHelper = new THREE.AxesHelper(1);
       axesHelper.renderOrder = 1;
       axesHelper.material.depthTest = false;
       scene.add(axesHelper);
@@ -188,7 +831,7 @@
       };
 
       function updatePointCloud(lidarData, channelCount) {
-        const angleOffset = Math.PI / 4; // 45도(π/4) 반시계 회전
+        const angleOffset = Math.PI / 4 - Math.PI / 36; // 45도 - 5도 = 40도
 
         for (let i = 0; i < channelCount; i++) {
           if (lidarData[i] && lidarData[i].length > 0) {
@@ -215,10 +858,10 @@
         let html = `<tr>
           <th>#</th>
           <th>각도 (°)</th>
-          <th>채널 0 (m)</th>
           <th>채널 1 (m)</th>
           <th>채널 2 (m)</th>
           <th>채널 3 (m)</th>
+          <th>채널 4 (m)</th>
       </tr>`;
 
         for (let i = 0; i < 400; i++) {
