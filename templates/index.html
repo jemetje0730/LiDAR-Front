@@ -450,7 +450,7 @@
           style="width: 100%"
         />
         <span id="areaDataValueLabel" style="display: block; text-align: center"
-          >0cm</span 
+          >0cm</span
         >
 
         <button
@@ -483,17 +483,6 @@
 
       closeBtn.addEventListener("click", () => {
         sidebar.classList.remove("show");
-      });
-      document.getElementById("getConfigBtn").addEventListener("click", () => {
-        const selectedConfig = document.getElementById("configType").value;
-        fetch("http://127.0.0.1:8000/get_config", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ config_type: selectedConfig }),
-        })
-          .then((response) => response.json())
-          .then((data) => console.log("LiDAR Response:", data))
-          .catch((error) => console.error("Error:", error));
       });
     </script>
 
@@ -656,20 +645,23 @@
           const selectedChannels = Array.from(
             document.querySelectorAll("input[name='outputChannel']:checked")
           ).map((el) => el.value);
-
           if (selectedChannels.length > 0) {
             alert(`Output Channel 설정: ${selectedChannels.join(", ")}`);
             document.getElementById("outputChannelOptions").style.display =
               "none";
-
-            // 서버로 설정값 전송 (예제 API 호출)
+            // bit 값 계산
+            let outputChannelData = 0;
+            selectedChannels.forEach((channel) => {
+              const index = parseInt(channel.replace("CH", ""));
+              outputChannelData |= 1 << (index - 1); // LSB부터 할당
+            });
             fetch("http://127.0.0.1:8000/set_output_channel", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ channels: selectedChannels }),
+              body: JSON.stringify({ output_channel: outputChannelData }),
             })
               .then((response) => response.json())
-              .then((data) => console.log("설정 완료:", data))
+              .then((data) => console.log("Output Channel 설정 완료:", data))
               .catch((error) => console.error("설정 오류:", error));
           } else {
             alert("최소 하나의 채널을 선택하세요.");
