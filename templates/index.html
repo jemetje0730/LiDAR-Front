@@ -135,16 +135,16 @@
         "
       >
         <label style="color: black; display: block; padding: 5px 0">
-          <input type="checkbox" name="outputChannel" value="CH1" /> CH1
+          <input type="checkbox" name="outputChannel" value="CH1" checked /> CH1
         </label>
         <label style="color: black; display: block; padding: 5px 0">
-          <input type="checkbox" name="outputChannel" value="CH2" /> CH2
+          <input type="checkbox" name="outputChannel" value="CH2" checked /> CH2
         </label>
         <label style="color: black; display: block; padding: 5px 0">
-          <input type="checkbox" name="outputChannel" value="CH3" /> CH3
+          <input type="checkbox" name="outputChannel" value="CH3" checked /> CH3
         </label>
         <label style="color: black; display: block; padding: 5px 0">
-          <input type="checkbox" name="outputChannel" value="CH4" /> CH4
+          <input type="checkbox" name="outputChannel" value="CH4" checked /> CH4
         </label>
         <button
           id="setOutputChannel"
@@ -196,7 +196,7 @@
           <input type="radio" name="selfCheck" value="Low" /> Low
         </label>
         <label style="color: black; display: block; padding: 5px 0">
-          <input type="radio" name="selfCheck" value="High" /> High
+          <input type="radio" name="selfCheck" value="High" checked /> High
         </label>
         <button
           id="setSelfCheck"
@@ -675,11 +675,6 @@
             );
 
             console.log("✅ 활성화된 채널:", activeChannels);
-
-            // ✅ 선택한 채널만 즉시 그래프 반영
-            if (lastLidarData) {
-              updatePointCloud(lastLidarData, 4);
-            }
           });
 
         document
@@ -814,8 +809,22 @@
         }
       }
 
+      document.addEventListener("DOMContentLoaded", () => {
+        // ✅ 모든 Output Channel 체크박스를 자동 체크
+        document
+          .querySelectorAll("input[name='outputChannel']")
+          .forEach((checkbox) => {
+            checkbox.checked = true;
+          });
+
+        console.log("✅ 초기 설정: 모든 채널 활성화됨");
+      });
+
       // ✅ LiDAR 포인트 클라우드 업데이트 함수 수정
       let ws = new WebSocket("ws://127.0.0.1:8000/ws/lidar");
+
+      // ✅ 처음에는 모든 채널이 활성화됨 (0,1,2,3 = CH1, CH2, CH3, CH4)
+      let activeChannels = new Set([0, 1, 2, 3]);
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -825,7 +834,8 @@
 
         lastLidarData = data.lidar_data; // ✅ 최신 데이터 저장
 
-        updatePointCloud(lastLidarData, 4); // ✅ 선택한 채널만 업데이트
+        // ✅ 처음부터 모든 채널 활성화해서 반영
+        updatePointCloud(lastLidarData, 4);
         updateDistanceTable(data.distances);
       };
 
