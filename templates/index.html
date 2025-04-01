@@ -376,15 +376,69 @@
       </button>
 
       <!-- Distance Range 설정 옵션 -->
-      <div id="distanceRangeOptions" style="display: none">
-        <label>Min Distance: <span id="minDistanceLabel">0m</span></label>
-        <input type="range" id="minDistance" min="0" max="49" value="0" />
+      <div
+        id="distanceRangeOptions"
+        style="
+          display: none;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 10px;
+          border-radius: 5px;
+          margin-top: 5px;
+        "
+      >
+        <label
+          for="minDistance"
+          style="color: black; display: block; padding: 5px 0"
+          >Min Distance (0-49m):</label
+        >
+        <input
+          type="range"
+          id="minDistance"
+          min="0"
+          max="49"
+          value="0"
+          step="1"
+          style="width: 100%"
+        />
+        <span id="minDistanceLabel" style="display: block; text-align: center"
+          >0m</span
+        >
 
-        <label>Max Distance: <span id="maxDistanceLabel">50m</span></label>
-        <input type="range" id="maxDistance" min="1" max="50" value="50" />
+        <label
+          for="maxDistance"
+          style="color: black; display: block; padding: 5px 0"
+          >Max Distance (1-50m):</label
+        >
+        <input
+          type="range"
+          id="maxDistance"
+          min="1"
+          max="50"
+          value="50"
+          step="1"
+          style="width: 100%"
+        />
+        <span id="maxDistanceLabel" style="display: block; text-align: center"
+          >50m</span
+        >
 
-        <button id="setDistanceRange">설정</button>
+        <button
+          id="setDistanceRange"
+          style="
+            width: 100%;
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 5px;
+          "
+        >
+          설정
+        </button>
       </div>
+
       <button
         id="areaDataBtn"
         style="
@@ -465,270 +519,178 @@
     </script>
 
     <script>
-      // Area Data 버튼 클릭 시 설정 옵션 토글
-      document.getElementById("areaDataBtn").addEventListener("click", () => {
-        const options = document.getElementById("areaDataOptions");
-        options.style.display =
-          options.style.display === "none" ? "block" : "none";
-      });
+      document.addEventListener("DOMContentLoaded", () => {
+        // ✨ [1] 토글 기능 공통 함수
+        function toggleOptions(buttonId, optionsId) {
+          document.getElementById(buttonId).addEventListener("click", () => {
+            const options = document.getElementById(optionsId);
+            options.style.display =
+              options.style.display === "none" ? "block" : "none";
+          });
+        }
 
-      // Area Size 범위 값 표시 업데이트
-      document
-        .getElementById("areaDataValue")
-        .addEventListener("input", (event) => {
-          const value = event.target.value;
-          document.getElementById("areaDataValueLabel").innerText =
-            value + "cm";
-        });
+        // ✨ [2] 범위 값 업데이트 함수
+        function updateRangeValue(inputId, labelId, unit = "") {
+          document
+            .getElementById(inputId)
+            .addEventListener("input", (event) => {
+              document.getElementById(labelId).innerText =
+                event.target.value + unit;
+            });
+        }
 
-      // Area Data 설정 버튼 클릭 시 서버로 값 전송
-      document.getElementById("setAreaData").addEventListener("click", () => {
-        const areaValue = document.getElementById("areaDataValue").value;
-
-        alert(`Area Data 설정: ${areaValue}cm`);
-
-        // 서버로 Area Data 값 전송 (예제 API 호출)
-        fetch("http://127.0.0.1:8000/set_area_data", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ area_data: parseInt(areaValue) }),
-        })
-          .then((response) => response.json())
-          .then((data) => console.log("Area Data 설정 완료:", data))
-          .catch((error) => console.error("설정 오류:", error));
-      });
-    </script>
-
-    <script>
-      // Distance Range 버튼 클릭 시 설정 옵션 토글
-      document
-        .getElementById("distanceRangeBtn")
-        .addEventListener("click", () => {
-          const options = document.getElementById("distanceRangeOptions");
-          options.style.display =
-            options.style.display === "none" || options.style.display === ""
-              ? "block"
-              : "none";
-        });
-
-      // Max Distance 범위 값 표시 업데이트
-      document
-        .getElementById("maxDistance") // 올바른 ID 사용
-        .addEventListener("input", (event) => {
-          const value = event.target.value;
-          document.getElementById("maxDistanceLabel").innerText = `${value}m`;
-        });
-
-      // Min Distance 범위 값 표시 업데이트
-      document
-        .getElementById("minDistance") // 올바른 ID 사용
-        .addEventListener("input", (event) => {
-          const value = event.target.value;
-          document.getElementById("minDistanceLabel").innerText = `${value}m`;
-        });
-
-      // Distance Range 설정 버튼 클릭 시 서버로 값 전송
-      document
-        .getElementById("setDistanceRange")
-        .addEventListener("click", () => {
-          const minDistance = parseInt(
-            document.getElementById("minDistance").value
-          );
-          const maxDistance = parseInt(
-            document.getElementById("maxDistance").value
-          );
-
-          if (
-            isNaN(minDistance) ||
-            isNaN(maxDistance) ||
-            minDistance < 0 ||
-            maxDistance > 50 ||
-            minDistance >= maxDistance
-          ) {
-            alert("❌ 유효한 거리 범위를 입력하세요! (0~50m, min < max)");
-            return;
-          }
-
-          console.log(
-            `📤 Distance Range 설정 요청: min=${minDistance}m, max=${maxDistance}m`
-          );
-
-          fetch("http://127.0.0.1:8000/set_distance_range", {
+        // ✨ [3] 서버 요청 함수
+        function sendData(url, data, successMessage) {
+          fetch(`http://127.0.0.1:8000/${url}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              min_distance: minDistance,
-              max_distance: maxDistance,
-            }),
+            body: JSON.stringify(data),
           })
             .then((response) => response.json())
-            .then((data) => {
-              console.log("✅ Distance Range 설정 완료:", data);
-              alert(`✅ 설정 완료: min=${minDistance}, max=${maxDistance}`);
+            .then((res) => {
+              console.log(successMessage, res);
+              alert(`✅ ${successMessage}`);
             })
             .catch((error) => {
               console.error("❌ 설정 오류:", error);
-              alert("❌ Distance Range 설정 실패!");
+              alert("❌ 설정 실패!");
             });
-        });
-    </script>
-
-    <script>
-      // Pulse Data 버튼 클릭 시 설정 옵션 토글
-      document.getElementById("pulseDataBtn").addEventListener("click", () => {
-        const options = document.getElementById("pulseDataOptions");
-        options.style.display =
-          options.style.display === "none" ? "block" : "none";
-      });
-
-      // Pulse Value 범위 값 표시 업데이트
-      document
-        .getElementById("pulseDataValue")
-        .addEventListener("input", (event) => {
-          const value = event.target.value;
-          document.getElementById("pulseDataValueLabel").innerText = value;
-        });
-
-      // Pulse Data 설정 버튼 클릭 시 서버로 값 전송
-      document.getElementById("setPulseData").addEventListener("click", () => {
-        const pulseValue = document.getElementById("pulseDataValue").value;
-
-        alert(`Pulse Data 설정: ${pulseValue}`);
-
-        // 서버로 Pulse Data 값 전송 (예제 API 호출)
-        fetch("http://127.0.0.1:8000/set_pulse_data", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value: parseInt(pulseValue) }),
-        })
-          .then((response) => response.json())
-          .then((data) => console.log("Pulse Data 설정 완료:", data))
-          .catch((error) => console.error("설정 오류:", error));
-      });
-    </script>
-
-    <script>
-      // Angle Data 버튼 클릭 시 설정 옵션 토글
-      document.getElementById("angleDataBtn").addEventListener("click", () => {
-        const options = document.getElementById("angleDataOptions");
-        options.style.display =
-          options.style.display === "none" ? "block" : "none";
-      });
-
-      document
-        .getElementById("minAngleValue")
-        .addEventListener("input", (event) => {
-          document.getElementById("minAngleValueLabel").innerText =
-            event.target.value + "°";
-        });
-
-      document
-        .getElementById("maxAngleValue")
-        .addEventListener("input", (event) => {
-          document.getElementById("maxAngleValueLabel").innerText =
-            event.target.value + "°";
-        });
-
-      document.getElementById("setAngleData").addEventListener("click", () => {
-        const minAngle = parseInt(
-          document.getElementById("minAngleValue").value
-        );
-        const maxAngle = parseInt(
-          document.getElementById("maxAngleValue").value
-        );
-
-        if (minAngle > maxAngle) {
-          alert("Min Angle은 Max Angle보다 클 수 없습니다.");
-          return;
         }
 
-        // ✅ 서버로 Angle Data 전송
-        fetch("http://127.0.0.1:8000/set_angle_data", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ min_angle: minAngle, max_angle: maxAngle }), // ✅ JSON 키 수정
-        })
-          .then((response) => response.json())
-          .then((data) => console.log("✅ Angle Data 설정 완료:", data))
-          .catch((error) => console.error("❌ 설정 오류:", error));
-      });
-    </script>
+        // ✅ 토글 버튼 적용
+        toggleOptions("areaDataBtn", "areaDataOptions");
+        toggleOptions("distanceRangeBtn", "distanceRangeOptions");
+        toggleOptions("pulseDataBtn", "pulseDataOptions");
+        toggleOptions("angleDataBtn", "angleDataOptions");
+        toggleOptions("outputChannelBtn", "outputChannelOptions");
+        toggleOptions("selfCheckBtn", "selfCheckOptions");
 
-    <script>
-      document
-        .getElementById("outputChannelBtn")
-        .addEventListener("click", () => {
-          const options = document.getElementById("outputChannelOptions");
-          options.style.display =
-            options.style.display === "none" ? "block" : "none";
+        // ✅ 범위 값 업데이트 적용
+        updateRangeValue("areaDataValue", "areaDataValueLabel", "cm");
+        updateRangeValue("maxDistance", "maxDistanceLabel", "m");
+        updateRangeValue("minDistance", "minDistanceLabel", "m");
+        updateRangeValue("pulseDataValue", "pulseDataValueLabel");
+        updateRangeValue("minAngleValue", "minAngleValueLabel", "°");
+        updateRangeValue("maxAngleValue", "maxAngleValueLabel", "°");
+
+        // ✅ 설정 버튼 이벤트 적용
+        document.getElementById("setAreaData").addEventListener("click", () => {
+          sendData(
+            "set_area_data",
+            {
+              area_data: parseInt(
+                document.getElementById("areaDataValue").value
+              ),
+            },
+            "Area Data 설정 완료!"
+          );
         });
 
-      document
-        .getElementById("setOutputChannel")
-        .addEventListener("click", () => {
-          const selectedChannels = Array.from(
-            document.querySelectorAll("input[name='outputChannel']:checked")
-          ).map((el) => el.value);
-          if (selectedChannels.length > 0) {
-            alert(`Output Channel 설정: ${selectedChannels.join(", ")}`);
-            document.getElementById("outputChannelOptions").style.display =
-              "none";
+        document
+          .getElementById("setDistanceRange")
+          .addEventListener("click", () => {
+            const minDistance = parseInt(
+              document.getElementById("minDistance").value
+            );
+            const maxDistance = parseInt(
+              document.getElementById("maxDistance").value
+            );
 
-            // bit 값 계산
+            if (
+              isNaN(minDistance) ||
+              isNaN(maxDistance) ||
+              minDistance < 0 ||
+              maxDistance > 50 ||
+              minDistance >= maxDistance
+            ) {
+              alert("❌ 유효한 거리 범위를 입력하세요! (0~50m, min < max)");
+              return;
+            }
+            sendData(
+              "set_distance_range",
+              { min_distance: minDistance, max_distance: maxDistance },
+              "Distance Range 설정 완료!"
+            );
+          });
+
+        document
+          .getElementById("setPulseData")
+          .addEventListener("click", () => {
+            sendData(
+              "set_pulse_data",
+              {
+                value: parseInt(
+                  document.getElementById("pulseDataValue").value
+                ),
+              },
+              "Pulse Data 설정 완료!"
+            );
+          });
+
+        document
+          .getElementById("setAngleData")
+          .addEventListener("click", () => {
+            const minAngle = parseInt(
+              document.getElementById("minAngleValue").value
+            );
+            const maxAngle = parseInt(
+              document.getElementById("maxAngleValue").value
+            );
+
+            if (minAngle > maxAngle) {
+              alert("❌ Min Angle은 Max Angle보다 클 수 없습니다.");
+              return;
+            }
+            sendData(
+              "set_angle_data",
+              { min_angle: minAngle, max_angle: maxAngle },
+              "Angle Data 설정 완료!"
+            );
+          });
+
+        document
+          .getElementById("setOutputChannel")
+          .addEventListener("click", () => {
+            const selectedChannels = Array.from(
+              document.querySelectorAll("input[name='outputChannel']:checked")
+            ).map((el) => el.value);
+
+            if (selectedChannels.length === 0) {
+              alert("❌ 최소 하나의 채널을 선택하세요.");
+              return;
+            }
+
             let outputChannelData = 0;
             selectedChannels.forEach((channel) => {
-              const index = parseInt(channel.replace("CH", ""));
-              outputChannelData |= 1 << (index - 1); // LSB부터 할당
+              outputChannelData |=
+                1 << (parseInt(channel.replace("CH", "")) - 1);
             });
 
-            // Output Channel을 서버에 전송
-            fetch("http://127.0.0.1:8000/set_output_channel", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ output_channel: outputChannelData }),
-            })
-              .then((response) => response.json())
-              .then((data) => {
-                console.log("Output Channel 설정 완료:", data);
-                // ED 패킷 전송 성공 시, 추가로 ED 요청 전송
-                if (data.config_response) {
-                  alert("ED 패킷 전송 성공!");
-                }
-              })
-              .catch((error) => console.error("설정 오류:", error));
-          } else {
-            alert("최소 하나의 채널을 선택하세요.");
-          }
-        });
-    </script>
+            sendData(
+              "set_output_channel",
+              { output_channel: outputChannelData },
+              "Output Channel 설정 완료!"
+            );
+          });
 
-    <script>
-      document.getElementById("selfCheckBtn").addEventListener("click", () => {
-        const options = document.getElementById("selfCheckOptions");
-        options.style.display =
-          options.style.display === "none" ? "block" : "none";
-      });
+        document
+          .getElementById("setSelfCheck")
+          .addEventListener("click", () => {
+            const selectedOption = document.querySelector(
+              "input[name='selfCheck']:checked"
+            );
 
-      document.getElementById("setSelfCheck").addEventListener("click", () => {
-        const selectedOption = document.querySelector(
-          "input[name='selfCheck']:checked"
-        );
-        if (selectedOption) {
-          alert(`Self Check Active State 설정: ${selectedOption.value}`);
-          document.getElementById("selfCheckOptions").style.display = "none";
+            if (!selectedOption) {
+              alert("❌ 옵션을 선택하세요.");
+              return;
+            }
 
-          // 서버로 설정값 전송 (예제 API 호출)
-          fetch("http://127.0.0.1:8000/set_self_check", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ state: selectedOption.value }),
-          })
-            .then((response) => response.json())
-            .then((data) => console.log("설정 완료:", data))
-            .catch((error) => console.error("설정 오류:", error));
-        } else {
-          alert("옵션을 선택하세요.");
-        }
+            sendData(
+              "set_self_check",
+              { state: selectedOption.value },
+              "Self Check Active State 설정 완료!"
+            );
+          });
       });
     </script>
 
