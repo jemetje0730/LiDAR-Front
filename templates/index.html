@@ -308,25 +308,40 @@
         "
       >
         <label
-          for="angleDataValue"
+          for="minAngleValue"
           style="color: black; display: block; padding: 5px 0"
-          >Angle Value (0-100°):</label
+          >Min Angle (0-100°):</label
         >
         <input
           type="range"
-          id="angleDataValue"
+          id="minAngleValue"
           min="0"
           max="100"
           step="1"
           value="0"
           style="width: 100%"
         />
-        <span
-          id="angleDataValueLabel"
-          style="display: block; text-align: center"
+        <span id="minAngleValueLabel" style="display: block; text-align: center"
           >0°</span
         >
 
+        <label
+          for="maxAngleValue"
+          style="color: black; display: block; padding: 5px 0"
+          >Max Angle (0-100°):</label
+        >
+        <input
+          type="range"
+          id="maxAngleValue"
+          min="0"
+          max="100"
+          step="1"
+          value="100"
+          style="width: 100%"
+        />
+        <span id="maxAngleValueLabel" style="display: block; text-align: center"
+          >100°</span
+        >
         <button
           id="setAngleData"
           style="
@@ -361,51 +376,14 @@
       </button>
 
       <!-- Distance Range 설정 옵션 -->
-      <div
-        id="distanceRangeOptions"
-        style="
-          display: none;
-          background: rgba(255, 255, 255, 0.8);
-          padding: 10px;
-          border-radius: 5px;
-          margin-top: 5px;
-        "
-      >
-        <label
-          for="distanceRangeValue"
-          style="color: black; display: block; padding: 5px 0"
-          >Distance Value (0-50m):</label
-        >
-        <input
-          type="range"
-          id="distanceRangeValue"
-          min="0"
-          max="50"
-          step="1"
-          value="0"
-          style="width: 100%"
-        />
-        <span
-          id="distanceRangeValueLabel"
-          style="display: block; text-align: center"
-          >0m</span
-        >
+      <div id="distanceRangeOptions" style="display: none">
+        <label>Min Distance: <span id="minDistanceLabel">0m</span></label>
+        <input type="range" id="minDistance" min="0" max="49" value="0" />
 
-        <button
-          id="setDistanceRange"
-          style="
-            width: 100%;
-            padding: 8px 15px;
-            background: rgba(255, 255, 255, 0.8);
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            margin-top: 5px;
-          "
-        >
-          설정
-        </button>
+        <label>Max Distance: <span id="maxDistanceLabel">50m</span></label>
+        <input type="range" id="maxDistance" min="1" max="50" value="50" />
+
+        <button id="setDistanceRange">설정</button>
       </div>
       <button
         id="areaDataBtn"
@@ -528,36 +506,70 @@
         .addEventListener("click", () => {
           const options = document.getElementById("distanceRangeOptions");
           options.style.display =
-            options.style.display === "none" ? "block" : "none";
+            options.style.display === "none" || options.style.display === ""
+              ? "block"
+              : "none";
         });
 
-      // Distance Value 범위 값 표시 업데이트
+      // Max Distance 범위 값 표시 업데이트
       document
-        .getElementById("distanceRangeValue")
+        .getElementById("maxDistance") // 올바른 ID 사용
         .addEventListener("input", (event) => {
           const value = event.target.value;
-          document.getElementById("distanceRangeValueLabel").innerText =
-            value + "m";
+          document.getElementById("maxDistanceLabel").innerText = `${value}m`;
+        });
+
+      // Min Distance 범위 값 표시 업데이트
+      document
+        .getElementById("minDistance") // 올바른 ID 사용
+        .addEventListener("input", (event) => {
+          const value = event.target.value;
+          document.getElementById("minDistanceLabel").innerText = `${value}m`;
         });
 
       // Distance Range 설정 버튼 클릭 시 서버로 값 전송
       document
         .getElementById("setDistanceRange")
         .addEventListener("click", () => {
-          const distanceValue =
-            document.getElementById("distanceRangeValue").value;
+          const minDistance = parseInt(
+            document.getElementById("minDistance").value
+          );
+          const maxDistance = parseInt(
+            document.getElementById("maxDistance").value
+          );
 
-          alert(`Distance Range 설정: ${distanceValue}m`);
+          if (
+            isNaN(minDistance) ||
+            isNaN(maxDistance) ||
+            minDistance < 0 ||
+            maxDistance > 50 ||
+            minDistance >= maxDistance
+          ) {
+            alert("❌ 유효한 거리 범위를 입력하세요! (0~50m, min < max)");
+            return;
+          }
 
-          // 서버로 Distance Range 값 전송 (예제 API 호출)
+          console.log(
+            `📤 Distance Range 설정 요청: min=${minDistance}m, max=${maxDistance}m`
+          );
+
           fetch("http://127.0.0.1:8000/set_distance_range", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ distance_range: parseInt(distanceValue) }),
+            body: JSON.stringify({
+              min_distance: minDistance,
+              max_distance: maxDistance,
+            }),
           })
             .then((response) => response.json())
-            .then((data) => console.log("Distance Range 설정 완료:", data))
-            .catch((error) => console.error("설정 오류:", error));
+            .then((data) => {
+              console.log("✅ Distance Range 설정 완료:", data);
+              alert(`✅ 설정 완료: min=${minDistance}, max=${maxDistance}`);
+            })
+            .catch((error) => {
+              console.error("❌ 설정 오류:", error);
+              alert("❌ Distance Range 설정 실패!");
+            });
         });
     </script>
 
@@ -587,7 +599,7 @@
         fetch("http://127.0.0.1:8000/set_pulse_data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pulse_data: parseInt(pulseValue) }),
+          body: JSON.stringify({ value: parseInt(pulseValue) }),
         })
           .then((response) => response.json())
           .then((data) => console.log("Pulse Data 설정 완료:", data))
@@ -603,30 +615,42 @@
           options.style.display === "none" ? "block" : "none";
       });
 
-      // Angle Value 범위 값 표시 업데이트
       document
-        .getElementById("angleDataValue")
+        .getElementById("minAngleValue")
         .addEventListener("input", (event) => {
-          const value = event.target.value;
-          document.getElementById("angleDataValueLabel").innerText =
-            value + "°";
+          document.getElementById("minAngleValueLabel").innerText =
+            event.target.value + "°";
         });
 
-      // Angle Data 설정 버튼 클릭 시 서버로 값 전송
+      document
+        .getElementById("maxAngleValue")
+        .addEventListener("input", (event) => {
+          document.getElementById("maxAngleValueLabel").innerText =
+            event.target.value + "°";
+        });
+
       document.getElementById("setAngleData").addEventListener("click", () => {
-        const angleValue = document.getElementById("angleDataValue").value;
+        const minAngle = parseInt(
+          document.getElementById("minAngleValue").value
+        );
+        const maxAngle = parseInt(
+          document.getElementById("maxAngleValue").value
+        );
 
-        alert(`Angle Data 설정: ${angleValue}°`);
+        if (minAngle > maxAngle) {
+          alert("Min Angle은 Max Angle보다 클 수 없습니다.");
+          return;
+        }
 
-        // 서버로 Angle Data 값 전송 (예제 API 호출)
+        // ✅ 서버로 Angle Data 전송
         fetch("http://127.0.0.1:8000/set_angle_data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ angle_data: parseInt(angleValue) }),
+          body: JSON.stringify({ min_angle: minAngle, max_angle: maxAngle }), // ✅ JSON 키 수정
         })
           .then((response) => response.json())
-          .then((data) => console.log("Angle Data 설정 완료:", data))
-          .catch((error) => console.error("설정 오류:", error));
+          .then((data) => console.log("✅ Angle Data 설정 완료:", data))
+          .catch((error) => console.error("❌ 설정 오류:", error));
       });
     </script>
 
@@ -649,19 +673,28 @@
             alert(`Output Channel 설정: ${selectedChannels.join(", ")}`);
             document.getElementById("outputChannelOptions").style.display =
               "none";
+
             // bit 값 계산
             let outputChannelData = 0;
             selectedChannels.forEach((channel) => {
               const index = parseInt(channel.replace("CH", ""));
               outputChannelData |= 1 << (index - 1); // LSB부터 할당
             });
+
+            // Output Channel을 서버에 전송
             fetch("http://127.0.0.1:8000/set_output_channel", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ output_channel: outputChannelData }),
             })
               .then((response) => response.json())
-              .then((data) => console.log("Output Channel 설정 완료:", data))
+              .then((data) => {
+                console.log("Output Channel 설정 완료:", data);
+                // ED 패킷 전송 성공 시, 추가로 ED 요청 전송
+                if (data.config_response) {
+                  alert("ED 패킷 전송 성공!");
+                }
+              })
               .catch((error) => console.error("설정 오류:", error));
           } else {
             alert("최소 하나의 채널을 선택하세요.");
@@ -762,16 +795,17 @@
       }
 
       function updateDistanceLabels() {
-        distanceLabels.forEach((label) => {
-          const pos = new THREE.Vector3(label.distance, 0, 0);
-          pos.project(camera);
+        const minDistance = parseInt(
+          document.getElementById("minDistance").value
+        );
+        const maxDistance = parseInt(
+          document.getElementById("maxDistance").value
+        );
 
-          const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-          const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-
-          label.element.style.left = `${x}px`;
-          label.element.style.top = `${y}px`;
-        });
+        document.getElementById("minDistanceLabel").innerText =
+          minDistance + "m";
+        document.getElementById("maxDistanceLabel").innerText =
+          maxDistance + "m";
       }
 
       function createGrid(size) {
