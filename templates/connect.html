@@ -78,7 +78,7 @@
             const port = document.getElementById("port").value.trim();
             const statusMessage = document.getElementById("status-message");
 
-            // ✅ 서버에 연결 요청
+            // 서버에 연결 요청
             try {
                 const response = await fetch("http://127.0.0.1:8000/connect", {
                     method: "POST",

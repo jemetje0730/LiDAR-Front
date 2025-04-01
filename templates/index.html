@@ -86,7 +86,7 @@
     <button id="menu-btn">☰</button>
     <button id="reset-btn">줌 초기화</button>
 
-    <!-- ✅ 사이드바 -->
+    <!-- 사이드바 -->
     <div id="sidebar">
       <h3>📌 LiDAR 설정</h3>
       <button id="close-btn">닫기</button>
@@ -504,7 +504,7 @@
     </div>
 
     <script>
-      // ✅ 사이드바 토글 기능
+      // 사이드바 토글 기능
       const menuBtn = document.getElementById("menu-btn");
       const sidebar = document.getElementById("sidebar");
       const closeBtn = document.getElementById("close-btn");
@@ -520,7 +520,7 @@
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        // ✨ [1] 토글 기능 공통 함수
+        // [1] 토글 기능 공통 함수
         function toggleOptions(buttonId, optionsId) {
           document.getElementById(buttonId).addEventListener("click", () => {
             const options = document.getElementById(optionsId);
@@ -529,7 +529,7 @@
           });
         }
 
-        // ✨ [2] 범위 값 업데이트 함수
+        // [2] 범위 값 업데이트 함수
         function updateRangeValue(inputId, labelId, unit = "") {
           document
             .getElementById(inputId)
@@ -539,7 +539,7 @@
             });
         }
 
-        // ✨ [3] 서버 요청 함수
+        // [3] 서버 요청 함수
         function sendData(url, data, successMessage) {
           fetch(`http://127.0.0.1:8000/${url}`, {
             method: "POST",
@@ -557,7 +557,7 @@
             });
         }
 
-        // ✅ 토글 버튼 적용
+        // 토글 버튼 적용
         toggleOptions("areaDataBtn", "areaDataOptions");
         toggleOptions("distanceRangeBtn", "distanceRangeOptions");
         toggleOptions("pulseDataBtn", "pulseDataOptions");
@@ -565,7 +565,7 @@
         toggleOptions("outputChannelBtn", "outputChannelOptions");
         toggleOptions("selfCheckBtn", "selfCheckOptions");
 
-        // ✅ 범위 값 업데이트 적용
+        // 범위 값 업데이트 적용
         updateRangeValue("areaDataValue", "areaDataValueLabel", "cm");
         updateRangeValue("maxDistance", "maxDistanceLabel", "m");
         updateRangeValue("minDistance", "minDistanceLabel", "m");
@@ -573,7 +573,7 @@
         updateRangeValue("minAngleValue", "minAngleValueLabel", "°");
         updateRangeValue("maxAngleValue", "maxAngleValueLabel", "°");
 
-        // ✅ 설정 버튼 이벤트 적용
+        // 설정 버튼 이벤트 적용
         document.getElementById("setAreaData").addEventListener("click", () => {
           sendData(
             "set_area_data",
@@ -660,7 +660,7 @@
               return;
             }
 
-            // ✅ activeChannels 업데이트 (선택한 채널만 저장)
+            // activeChannels 업데이트 (선택한 채널만 저장)
             activeChannels = new Set(selectedChannels);
 
             let outputChannelData = 0;
@@ -699,11 +699,11 @@
     </script>
 
     <script>
-      // 📌 초기 카메라 위치 저장
+      // 초기 카메라 위치 저장
       const initialCameraPosition = new THREE.Vector3(0, 0, 20);
       const initialTarget = new THREE.Vector3(0, 0, 0);
 
-      // 📌 초기화 버튼 클릭 이벤트
+      // 초기화 버튼 클릭 이벤트
       document.getElementById("reset-btn").addEventListener("click", () => {
         camera.position.copy(initialCameraPosition);
         controls.target.copy(initialTarget);
@@ -797,7 +797,7 @@
           const geometry = new THREE.BufferGeometry();
           const material = new THREE.PointsMaterial({
             color: channelColors[i % 4],
-            size: 0.05, // ✅ 포인트 크기 조정
+            size: 0.05, // 포인트 크기 조정
             transparent: true,
             opacity: 0.9,
           });
@@ -805,12 +805,12 @@
           pointClouds[i] = new THREE.Points(geometry, material);
           scene.add(pointClouds[i]);
 
-          console.log(`✅ 채널 ${i} 포인트 클라우드 추가됨`); // ✅ 추가 확인 로그
+          console.log(`✅ 채널 ${i} 포인트 클라우드 추가됨`); // 추가 확인 로그
         }
       }
 
       document.addEventListener("DOMContentLoaded", () => {
-        // ✅ 모든 Output Channel 체크박스를 자동 체크
+        // 모든 Output Channel 체크박스를 자동 체크
         document
           .querySelectorAll("input[name='outputChannel']")
           .forEach((checkbox) => {
@@ -820,10 +820,10 @@
         console.log("✅ 초기 설정: 모든 채널 활성화됨");
       });
 
-      // ✅ LiDAR 포인트 클라우드 업데이트 함수 수정
+      // LiDAR 포인트 클라우드 업데이트 함수 수정
       let ws = new WebSocket("ws://127.0.0.1:8000/ws/lidar");
 
-      // ✅ 처음에는 모든 채널이 활성화됨 (0,1,2,3 = CH1, CH2, CH3, CH4)
+      // 처음에는 모든 채널이 활성화됨 (0,1,2,3 = CH1, CH2, CH3, CH4)
       let activeChannels = new Set([0, 1, 2, 3]);
 
       ws.onmessage = (event) => {
@@ -832,9 +832,9 @@
 
         console.log("📡 WebSocket 데이터 수신:", data);
 
-        lastLidarData = data.lidar_data; // ✅ 최신 데이터 저장
+        lastLidarData = data.lidar_data; // 최신 데이터 저장
 
-        // ✅ 처음부터 모든 채널 활성화해서 반영
+        // 처음부터 모든 채널 활성화해서 반영
         updatePointCloud(lastLidarData, 4);
         updateDistanceTable(data.distances);
       };
@@ -846,7 +846,7 @@
 
         for (let i = 0; i < channelCount; i++) {
           if (!activeChannels.has(i)) {
-            // ✅ 선택되지 않은 채널은 숨김 (빈 BufferGeometry 적용)
+            // 선택되지 않은 채널은 숨김 (빈 BufferGeometry 적용)
             pointClouds[i].geometry.dispose();
             pointClouds[i].geometry = new THREE.BufferGeometry();
             continue;
@@ -883,10 +883,10 @@
       </tr>`;
 
         for (let i = 0; i < 400; i++) {
-          // ✅ 각도 400개 기준으로 업데이트
+          // 각도 400개 기준으로 업데이트
           const angle = (i * 0.25).toFixed(2);
 
-          // ✅ 거리 값 처리 (최대 50m 제한 & 소수 둘째 자리까지 표시)
+          // 거리 값 처리 (최대 50m 제한 & 소수 둘째 자리까지 표시)
           const formatDistance = (d) =>
             d !== undefined ? Math.min(50, parseFloat(d)).toFixed(2) : "-";
 

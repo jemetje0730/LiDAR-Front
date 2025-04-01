@@ -8,7 +8,7 @@ CORS(app)  # 모든 도메인에서의 접근을 허용
 def home():
     return render_template("connect.html")
 
-@app.route("/index")  # ✅ index.html 라우트 추가
+@app.route("/index")  # index.html 라우트 추가
 def index():
     return render_template("index.html")
 
