@@ -653,17 +653,19 @@
           .addEventListener("click", () => {
             const selectedChannels = Array.from(
               document.querySelectorAll("input[name='outputChannel']:checked")
-            ).map((el) => el.value);
+            ).map((el) => parseInt(el.value.replace("CH", "")) - 1);
 
             if (selectedChannels.length === 0) {
               alert("❌ 최소 하나의 채널을 선택하세요.");
               return;
             }
 
+            // ✅ activeChannels 업데이트 (선택한 채널만 저장)
+            activeChannels = new Set(selectedChannels);
+
             let outputChannelData = 0;
             selectedChannels.forEach((channel) => {
-              outputChannelData |=
-                1 << (parseInt(channel.replace("CH", "")) - 1);
+              outputChannelData |= 1 << channel;
             });
 
             sendData(
@@ -671,6 +673,13 @@
               { output_channel: outputChannelData },
               "Output Channel 설정 완료!"
             );
+
+            console.log("✅ 활성화된 채널:", activeChannels);
+
+            // ✅ 선택한 채널만 즉시 그래프 반영
+            if (lastLidarData) {
+              updatePointCloud(lastLidarData, 4);
+            }
           });
 
         document
@@ -814,14 +823,25 @@
 
         console.log("📡 WebSocket 데이터 수신:", data);
 
-        updatePointCloud(data.lidar_data, 4);
-        updateDistanceTable(data.distances); // ✅ 거리 테이블도 업데이트
+        lastLidarData = data.lidar_data; // ✅ 최신 데이터 저장
+
+        updatePointCloud(lastLidarData, 4); // ✅ 선택한 채널만 업데이트
+        updateDistanceTable(data.distances);
       };
 
       function updatePointCloud(lidarData, channelCount) {
-        const angleOffset = Math.PI / 4 - Math.PI / 36; // 45도 - 5도 = 40도
+        if (!lidarData) return;
+
+        const angleOffset = Math.PI / 4 - Math.PI / 36; // 40도
 
         for (let i = 0; i < channelCount; i++) {
+          if (!activeChannels.has(i)) {
+            // ✅ 선택되지 않은 채널은 숨김 (빈 BufferGeometry 적용)
+            pointClouds[i].geometry.dispose();
+            pointClouds[i].geometry = new THREE.BufferGeometry();
+            continue;
+          }
+
           if (lidarData[i] && lidarData[i].length > 0) {
             const points = lidarData[i].map((p) => {
               const x =
