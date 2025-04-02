@@ -834,12 +834,25 @@
 
         lastLidarData = data.lidar_data; // 최신 데이터 저장
 
+        // 거리 범위 설정값 받아오기
+        const minDistance = parseInt(
+          document.getElementById("minDistance").value
+        );
+        const maxDistance = parseInt(
+          document.getElementById("maxDistance").value
+        );
+
         // 처음부터 모든 채널 활성화해서 반영
-        updatePointCloud(lastLidarData, 4);
+        updatePointCloud(lastLidarData, 4, minDistance, maxDistance);
         updateDistanceTable(data.distances);
       };
 
-      function updatePointCloud(lidarData, channelCount) {
+      function updatePointCloud(
+        lidarData,
+        channelCount,
+        minDistance,
+        maxDistance
+      ) {
         if (!lidarData) return;
 
         const angleOffset = Math.PI / 4 - Math.PI / 36; // 40도
@@ -853,13 +866,20 @@
           }
 
           if (lidarData[i] && lidarData[i].length > 0) {
-            const points = lidarData[i].map((p) => {
-              const x =
-                p.x * Math.cos(angleOffset) - p.y * Math.sin(angleOffset);
-              const y =
-                p.x * Math.sin(angleOffset) + p.y * Math.cos(angleOffset);
-              return new THREE.Vector3(x, y, p.z);
-            });
+            const points = lidarData[i]
+              .map((p) => {
+                const distance = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+                // 거리 범위 필터링 (min ~ max 범위 내의 데이터만 처리)
+                if (distance >= minDistance && distance <= maxDistance) {
+                  const x =
+                    p.x * Math.cos(angleOffset) - p.y * Math.sin(angleOffset);
+                  const y =
+                    p.x * Math.sin(angleOffset) + p.y * Math.cos(angleOffset);
+                  return new THREE.Vector3(x, y, p.z);
+                }
+                return null; // 범위 밖의 데이터는 제외
+              })
+              .filter((point) => point !== null); // null 값 제외
 
             if (pointClouds[i].geometry) {
               pointClouds[i].geometry.dispose();
