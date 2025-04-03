@@ -14,10 +14,10 @@
       /* 사이드바 스타일 */
       #sidebar {
         position: absolute;
-        left: -280px; /* 기본적으로 숨김 */
+        left: -300px; /* 기본적으로 숨김 */
         top: 0;
         width: 280px;
-        height: 100%;
+        height: 95%;
         background: rgba(0, 0, 0, 0.9);
         padding: 15px;
         transition: left 0.3s ease-in-out;
@@ -709,6 +709,186 @@
         controls.target.copy(initialTarget);
         controls.update();
       });
+    </script>
+
+    <script>
+      // window.onload: 기존 설정 불러오기
+      window.onload = function () {
+        // Output Channel 설정 복원
+        const savedChannels = JSON.parse(
+          localStorage.getItem("selectedChannels")
+        ) || [0, 1, 2, 3];
+        document
+          .querySelectorAll("input[name='outputChannel']")
+          .forEach((checkbox, index) => {
+            checkbox.checked = savedChannels.includes(index);
+          });
+        activeChannels = new Set(savedChannels);
+
+        // Self Check 설정 복원
+        const savedSelfCheck = localStorage.getItem("selfCheckState") || "low";
+        document
+          .querySelectorAll("input[name='selfCheck']")
+          .forEach((radio) => {
+            if (radio.value === savedSelfCheck) {
+              radio.checked = true;
+            }
+          });
+
+        // Area Data 값 복원
+        const savedAreaData = localStorage.getItem("areaData") || "10"; // 기본값 10cm
+        document.getElementById("areaDataValue").value = savedAreaData;
+        document.getElementById("areaDataValueLabel").innerText =
+          savedAreaData + "cm";
+
+        // 거리 범위 설정 복원
+        document.getElementById("minDistance").value =
+          localStorage.getItem("minDistance") || 0;
+        document.getElementById("maxDistance").value =
+          localStorage.getItem("maxDistance") || 50;
+        document.getElementById("minDistanceLabel").innerText =
+          document.getElementById("minDistance").value + "m";
+        document.getElementById("maxDistanceLabel").innerText =
+          document.getElementById("maxDistance").value + "m";
+
+        // Pulse Data 설정 복원
+        document.getElementById("pulseDataValue").value =
+          localStorage.getItem("pulseData") || 0;
+        document.getElementById("pulseDataValueLabel").innerText =
+          document.getElementById("pulseDataValue").value;
+
+        // Angle 설정 복원
+        document.getElementById("minAngleValue").value =
+          localStorage.getItem("minAngle") || 0;
+        document.getElementById("maxAngleValue").value =
+          localStorage.getItem("maxAngle") || 180;
+        document.getElementById("minAngleValueLabel").innerText =
+          document.getElementById("minAngleValue").value + "°";
+        document.getElementById("maxAngleValueLabel").innerText =
+          document.getElementById("maxAngleValue").value + "°";
+
+        console.log("🔄 기존 설정 적용 완료!", {
+          savedChannels,
+          savedSelfCheck,
+          savedAreaData,
+        });
+      };
+
+      // 설정 변경 시 저장하는 함수
+      function saveSettings() {
+        const selectedChannels = [];
+        document
+          .querySelectorAll("input[name='outputChannel']")
+          .forEach((checkbox, index) => {
+            if (checkbox.checked) {
+              selectedChannels.push(index);
+            }
+          });
+
+        localStorage.setItem(
+          "selectedChannels",
+          JSON.stringify(selectedChannels)
+        );
+        localStorage.setItem(
+          "minDistance",
+          document.getElementById("minDistance").value
+        );
+        localStorage.setItem(
+          "maxDistance",
+          document.getElementById("maxDistance").value
+        );
+        localStorage.setItem(
+          "pulseData",
+          document.getElementById("pulseDataValue").value
+        );
+        localStorage.setItem(
+          "minAngle",
+          document.getElementById("minAngleValue").value
+        );
+        localStorage.setItem(
+          "maxAngle",
+          document.getElementById("maxAngleValue").value
+        );
+
+        console.log("💾 설정 저장 완료!", { selectedChannels });
+      }
+
+      // Self Check 변경 시 저장
+      document.querySelectorAll("input[name='selfCheck']").forEach((radio) => {
+        radio.addEventListener("change", function () {
+          localStorage.setItem("selfCheckState", this.value);
+          console.log("💾 Self Check 상태 저장:", this.value);
+        });
+      });
+
+      document.getElementById("setSelfCheck").addEventListener("click", () => {
+        const selectedOption = document.querySelector(
+          "input[name='selfCheck']:checked"
+        );
+
+        if (!selectedOption) {
+          alert("❌ 옵션을 선택하세요.");
+          return;
+        }
+
+        localStorage.setItem("selfCheckState", selectedOption.value);
+        sendData(
+          "set_self_check",
+          { state: selectedOption.value },
+          "Self Check Active State 설정 완료!"
+        );
+      });
+
+      // Area Data 변경 시 저장
+      document
+        .getElementById("areaDataValue")
+        .addEventListener("input", function () {
+          localStorage.setItem("areaData", this.value);
+          document.getElementById("areaDataValueLabel").innerText =
+            this.value + "cm";
+          console.log("💾 Area Data 저장:", this.value);
+        });
+
+      document.getElementById("setAreaData").addEventListener("click", () => {
+        const areaData = parseInt(
+          document.getElementById("areaDataValue").value
+        );
+
+        if (isNaN(areaData) || areaData < 0) {
+          alert("❌ 올바른 값을 입력하세요.");
+          return;
+        }
+
+        localStorage.setItem("areaData", areaData);
+        sendData(
+          "set_area_data",
+          { area_data: areaData },
+          "Area Data 설정 완료!"
+        );
+      });
+
+      // 모든 입력 요소에 이벤트 추가 → 변경될 때 자동 저장
+      document
+        .querySelectorAll("input[name='outputChannel']")
+        .forEach((checkbox) => {
+          checkbox.addEventListener("change", saveSettings);
+        });
+
+      document
+        .getElementById("minDistance")
+        .addEventListener("input", saveSettings);
+      document
+        .getElementById("maxDistance")
+        .addEventListener("input", saveSettings);
+      document
+        .getElementById("pulseDataValue")
+        .addEventListener("input", saveSettings);
+      document
+        .getElementById("minAngleValue")
+        .addEventListener("input", saveSettings);
+      document
+        .getElementById("maxAngleValue")
+        .addEventListener("input", saveSettings);
     </script>
 
     <script>
