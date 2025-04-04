@@ -73,11 +73,12 @@
         width: 100%;
         border-collapse: collapse;
       }
-      #distance-table th,
       #distance-table td {
         border: 1px solid #ddd;
         padding: 5px;
+        min-width: 40px;
         text-align: center;
+        white-space: nowrap; /* 줄바꿈 방지 */
       }
     </style>
   </head>
@@ -96,11 +97,11 @@
         <table id="distance-table">
           <tr>
             <th>#</th>
-            <th>각도 (°)</th>
-            <th>채널 1 (m)</th>
-            <th>채널 2 (m)</th>
-            <th>채널 3 (m)</th>
-            <th>채널 4 (m)</th>
+            <th>각도</th>
+            <th>채널 1</th>
+            <th>채널 2</th>
+            <th>채널 3</th>
+            <th>채널 4</th>
           </tr>
         </table>
       </div>
@@ -1075,11 +1076,11 @@
         let table = document.getElementById("distance-table");
         let html = `<tr>
           <th>#</th>
-          <th>각도 (°)</th>
-          <th>채널 1 (m)</th>
-          <th>채널 2 (m)</th>
-          <th>채널 3 (m)</th>
-          <th>채널 4 (m)</th>
+          <th>각도</th>
+          <th>채널 1</th>
+          <th>채널 2</th>
+          <th>채널 3</th>
+          <th>채널 4</th>
       </tr>`;
 
         for (let i = 0; i < 400; i++) {
