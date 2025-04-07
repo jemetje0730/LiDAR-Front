@@ -106,6 +106,61 @@
         </table>
       </div>
 
+      <h3>📌 사용자 영역 설정</h3>
+      <!-- 사용자 영역 설정 버튼 추가 -->
+      <button
+        id="selectAreaBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 255, 255, 0.9);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        사용자 영역 설정
+      </button>
+
+      <!-- 사용자 영역 선택 완료 버튼 -->
+      <button
+        id="finishSelectBtn"
+        style="
+          display: none;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(0, 123, 255, 0.9);
+          color: white;
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        설정 완료
+      </button>
+
+      <button
+        id="resetAreaBtn"
+        style="
+          display: block;
+          width: 100%;
+          padding: 8px 15px;
+          background: rgba(255, 100, 100, 0.9);
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 5px;
+        "
+      >
+        사용자 영역 초기화
+      </button>
+
       <h3>📌 GetConfig</h3>
       <button
         id="outputChannelBtn"
@@ -587,6 +642,105 @@
           );
         });
 
+        let selectingArea = false;
+        let selectedVertices = [];
+        let areaLine = null;
+
+        document
+          .getElementById("selectAreaBtn")
+          .addEventListener("click", () => {
+            selectingArea = true;
+            selectedVertices = [];
+            if (areaLine) {
+              scene.remove(areaLine);
+              areaLine.geometry.dispose();
+              areaLine.material.dispose();
+              areaLine = null;
+            }
+            document.getElementById("finishSelectBtn").style.display = "inline";
+          });
+
+        document
+          .getElementById("finishSelectBtn")
+          .addEventListener("click", () => {
+            selectingArea = false;
+            document.getElementById("finishSelectBtn").style.display = "none";
+
+            if (selectedVertices.length < 3) {
+              alert("❌ 최소 3개 이상의 포인트를 선택하세요.");
+              return;
+            }
+
+            // Polygon 그리기 (흰색 선)
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+              ...selectedVertices,
+              selectedVertices[0],
+            ]);
+            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+            areaLine = new THREE.Line(geometry, material);
+            scene.add(areaLine);
+
+            checkPointsInsidePolygon(); // 내부 포인트 검사 및 색상 결정
+          });
+
+        // 🔝 전역 변수 선언
+        const dotGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+        const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+        renderer.domElement.addEventListener("click", (event) => {
+          if (!selectingArea) return;
+
+          const mouse = new THREE.Vector2(
+            (event.clientX / window.innerWidth) * 2 - 1,
+            -(event.clientY / window.innerHeight) * 2 + 1
+          );
+
+          const raycaster = new THREE.Raycaster();
+          raycaster.setFromCamera(mouse, camera);
+
+          const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+          const point = new THREE.Vector3();
+          raycaster.ray.intersectPlane(plane, point);
+
+          if (point) {
+            selectedVertices.push(point.clone());
+
+            const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+            dot.position.copy(point);
+            scene.add(dot);
+            areaDots.push(dot);
+          }
+        });
+
+        let areaDots = []; // 선택한 점들 저장용
+
+        document
+          .getElementById("resetAreaBtn")
+          .addEventListener("click", () => {
+            // 점들 제거
+            areaDots.forEach((dot) => {
+              scene.remove(dot);
+              dot.geometry.dispose();
+              dot.material.dispose();
+            });
+            areaDots = [];
+
+            // 선 제거
+            if (areaLine) {
+              scene.remove(areaLine);
+              areaLine.geometry.dispose();
+              areaLine.material.dispose();
+              areaLine = null;
+            }
+
+            selectedVertices = [];
+            selectingArea = false;
+            document.getElementById("finishSelectBtn").style.display = "none";
+
+            // 🧹 로컬스토리지도 초기화
+            localStorage.removeItem("customArea");
+          });
+
         document
           .getElementById("setDistanceRange")
           .addEventListener("click", () => {
@@ -988,6 +1142,60 @@
 
           console.log(`✅ 채널 ${i} 포인트 클라우드 추가됨`); // 추가 확인 로그
         }
+      }
+
+      function checkPointsInsidePolygon() {
+        const areaData = parseInt(localStorage.getItem("areaData") || "10"); // cm
+
+        let pointInsideExceeds = false;
+        let selectedVertices = []; // 선택된 포인트 저장 배열
+
+        for (const channelId in pointClouds) {
+          const pointCloud = pointClouds[channelId];
+          const positions = pointCloud.geometry.attributes.position.array;
+
+          for (let i = 0; i < positions.length; i += 3) {
+            const x = positions[i];
+            const y = positions[i + 1];
+            const z = positions[i + 2];
+
+            const distance = Math.sqrt(x * x + y * y) * 100; // m → cm
+
+            const point2D = new THREE.Vector2(x, y);
+            const polygon2D = selectedVertices.map(
+              (v) => new THREE.Vector2(v.x, v.y)
+            );
+
+            if (isPointInPolygon(point2D, polygon2D)) {
+              if (distance > areaData) {
+                pointInsideExceeds = true;
+                break;
+              }
+            }
+          }
+
+          if (pointInsideExceeds) break;
+        }
+
+        if (areaLine) {
+          areaLine.material.color.set(pointInsideExceeds ? 0x87ceeb : 0xffffff); // skyblue or white
+        }
+      }
+
+      function isPointInPolygon(point, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+          const xi = polygon[i].x,
+            yi = polygon[i].y;
+          const xj = polygon[j].x,
+            yj = polygon[j].y;
+
+          const intersect =
+            yi > point.y !== yj > point.y &&
+            point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+          if (intersect) inside = !inside;
+        }
+        return inside;
       }
 
       document.addEventListener("DOMContentLoaded", () => {
