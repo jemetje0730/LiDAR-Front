@@ -741,6 +741,9 @@
             localStorage.removeItem("customArea");
           });
 
+        let minDistanceLimit = 0;
+        let maxDistanceLimit = 50;
+
         document
           .getElementById("setDistanceRange")
           .addEventListener("click", () => {
@@ -761,6 +764,15 @@
               alert("❌ 유효한 거리 범위를 입력하세요! (0~50m, min < max)");
               return;
             }
+
+            minDistanceLimit = minDistance;
+            maxDistanceLimit = maxDistance;
+
+            // 👉 최신 데이터를 기반으로 그래프 다시 그리기
+            if (lastLidarData) {
+              updatePointCloud(lastLidarData, 4);
+            }
+
             sendData(
               "set_distance_range",
               { min_distance: minDistance, max_distance: maxDistance },
@@ -1103,6 +1115,10 @@
           document.getElementById("maxDistance").value
         );
 
+        // ✅ 실제 필터값으로 반영되게 변수에 저장!
+        minDistanceLimit = minDistance;
+        maxDistanceLimit = maxDistance;
+
         document.getElementById("minDistanceLabel").innerText =
           minDistance + "m";
         document.getElementById("maxDistanceLabel").innerText =
@@ -1145,54 +1161,74 @@
       }
 
       function checkPointsInsidePolygon() {
-        const areaData = parseInt(localStorage.getItem("areaData") || "10"); // cm
+        if (!selectedVertices || selectedVertices.length < 3) return;
 
-        let pointInsideExceeds = false;
-        let selectedVertices = []; // 선택된 포인트 저장 배열
+        const polygon = selectedVertices.map((v) => [v.x, v.y]); // 2D polygon
 
-        for (const channelId in pointClouds) {
-          const pointCloud = pointClouds[channelId];
-          const positions = pointCloud.geometry.attributes.position.array;
+        // 서버에서 받은 거리 데이터라고 가정 (예: 180개)
+        const distances = getDistanceData(); // [Float, Float, ..., Float]
+        const areaData = getCurrentAreaData(); // 사용자가 지정한 area_data (0~255)
 
-          for (let i = 0; i < positions.length; i += 3) {
-            const x = positions[i];
-            const y = positions[i + 1];
-            const z = positions[i + 2];
+        const insidePoints = [];
 
-            const distance = Math.sqrt(x * x + y * y) * 100; // m → cm
+        for (let i = 0; i < distances.length; i++) {
+          const angle = (i / distances.length) * 180; // 각도 계산 (예: 180도 기준)
+          if (angle < 0 || angle > 100) continue; // 범위 제한
 
-            const point2D = new THREE.Vector2(x, y);
-            const polygon2D = selectedVertices.map(
-              (v) => new THREE.Vector2(v.x, v.y)
-            );
+          const dist = distances[i];
+          const rad = (angle * Math.PI) / 180;
+          const x = Math.cos(rad) * dist;
+          const y = Math.sin(rad) * dist;
 
-            if (isPointInPolygon(point2D, polygon2D)) {
-              if (distance > areaData) {
-                pointInsideExceeds = true;
-                break;
-              }
+          const point2D = [x, y];
+
+          if (isPointInPolygon(point2D, polygon)) {
+            if (dist <= areaData) {
+              insidePoints.push({ x, y, color: 0x0000ff }); // 파란색
+            } else {
+              insidePoints.push({ x, y, color: 0xffffff }); // 흰색 (범위 벗어남)
             }
           }
-
-          if (pointInsideExceeds) break;
         }
 
-        if (areaLine) {
-          areaLine.material.color.set(pointInsideExceeds ? 0x87ceeb : 0xffffff); // skyblue or white
+        drawCheckedPoints(insidePoints);
+      }
+
+      let detectedDots = [];
+
+      function drawCheckedPoints(points) {
+        // 기존 점 제거
+        detectedDots.forEach((dot) => {
+          scene.remove(dot);
+          dot.geometry.dispose();
+          dot.material.dispose();
+        });
+        detectedDots = [];
+
+        // 새 점 추가
+        for (const pt of points) {
+          const geo = new THREE.SphereGeometry(0.1, 8, 8);
+          const mat = new THREE.MeshBasicMaterial({ color: pt.color });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(pt.x, pt.y, 0);
+          scene.add(mesh);
+          detectedDots.push(mesh);
         }
       }
 
-      function isPointInPolygon(point, polygon) {
+      function isPointInPolygon(point, vs) {
+        const x = point[0],
+          y = point[1];
         let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-          const xi = polygon[i].x,
-            yi = polygon[i].y;
-          const xj = polygon[j].x,
-            yj = polygon[j].y;
+        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+          const xi = vs[i][0],
+            yi = vs[i][1];
+          const xj = vs[j][0],
+            yj = vs[j][1];
 
           const intersect =
-            yi > point.y !== yj > point.y &&
-            point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+            yi > y != yj > y &&
+            x < ((xj - xi) * (y - yi)) / (yj - yi + 0.00001) + xi;
           if (intersect) inside = !inside;
         }
         return inside;
@@ -1209,10 +1245,11 @@
         console.log("✅ 초기 설정: 모든 채널 활성화됨");
       });
 
-      // LiDAR 포인트 클라우드 업데이트 함수 수정
+      let minDistanceLimit = 0;
+      let maxDistanceLimit = 50;
+
       let ws = new WebSocket("ws://127.0.0.1:8000/ws/lidar");
 
-      // 처음에는 모든 채널이 활성화됨 (0,1,2,3 = CH1, CH2, CH3, CH4)
       let activeChannels = new Set([0, 1, 2, 3]);
 
       ws.onmessage = (event) => {
@@ -1221,54 +1258,32 @@
 
         console.log("📡 WebSocket 데이터 수신:", data);
 
-        lastLidarData = data.lidar_data; // 최신 데이터 저장
+        lastLidarData = data.lidar_data;
 
-        // 거리 범위 설정값 받아오기
-        const minDistance = parseInt(
-          document.getElementById("minDistance").value
-        );
-        const maxDistance = parseInt(
-          document.getElementById("maxDistance").value
-        );
-
-        // 처음부터 모든 채널 활성화해서 반영
-        updatePointCloud(lastLidarData, 4, minDistance, maxDistance);
+        updatePointCloud(lastLidarData, 4);
         updateDistanceTable(data.distances);
       };
 
-      function updatePointCloud(
-        lidarData,
-        channelCount,
-        minDistance,
-        maxDistance
-      ) {
+      function updatePointCloud(lidarData, channelCount) {
         if (!lidarData) return;
 
-        const angleOffset = Math.PI / 4 - Math.PI / 36; // 40도
+        const angleOffset = Math.PI / 4 - Math.PI / 36;
 
         for (let i = 0; i < channelCount; i++) {
           if (!activeChannels.has(i)) {
-            // 선택되지 않은 채널은 숨김 (빈 BufferGeometry 적용)
             pointClouds[i].geometry.dispose();
             pointClouds[i].geometry = new THREE.BufferGeometry();
             continue;
           }
 
           if (lidarData[i] && lidarData[i].length > 0) {
-            const points = lidarData[i]
-              .map((p) => {
-                const distance = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
-                // 거리 범위 필터링 (min ~ max 범위 내의 데이터만 처리)
-                if (distance >= minDistance && distance <= maxDistance) {
-                  const x =
-                    p.x * Math.cos(angleOffset) - p.y * Math.sin(angleOffset);
-                  const y =
-                    p.x * Math.sin(angleOffset) + p.y * Math.cos(angleOffset);
-                  return new THREE.Vector3(x, y, p.z);
-                }
-                return null; // 범위 밖의 데이터는 제외
-              })
-              .filter((point) => point !== null); // null 값 제외
+            const points = lidarData[i].map((p) => {
+              const x =
+                p.x * Math.cos(angleOffset) - p.y * Math.sin(angleOffset);
+              const y =
+                p.x * Math.sin(angleOffset) + p.y * Math.cos(angleOffset);
+              return new THREE.Vector3(x, y, p.z);
+            });
 
             if (pointClouds[i].geometry) {
               pointClouds[i].geometry.dispose();
