@@ -573,41 +573,44 @@
         sidebar.classList.remove("show");
       });
 
-      // 페이지 로드 시 로컬 스토리지에서 데이터 불러오기
       window.addEventListener("load", () => {
         const savedVertices = JSON.parse(
           localStorage.getItem("selectedVertices")
         );
-        const savedDetectedDots = JSON.parse(
-          localStorage.getItem("detectedDots")
+        const savedClickedDots = JSON.parse(
+          localStorage.getItem("clickedDots")
         );
 
-        // 만약 로컬 스토리지에 저장된 selectedVertices가 있다면, 폴리곤과 점을 복원
         if (savedVertices && savedVertices.length >= 3) {
           selectedVertices = savedVertices;
 
-          // Polygon 그리기 (폴리곤 선 복원)
+          // 폴리곤 선 복원
           const geometry = new THREE.BufferGeometry().setFromPoints([
             ...selectedVertices,
-            selectedVertices[0], // 첫 번째 점으로 돌아가서 닫는 폴리곤
+            selectedVertices[0],
           ]);
           const material = new THREE.LineBasicMaterial({ color: 0xffffff });
           areaLine = new THREE.Line(geometry, material);
           scene.add(areaLine);
+        }
 
-          // 내부 포인트 검사
-          checkPointsInsidePolygon();
-
-          // 저장된 점들이 있다면 복원
-          if (savedDetectedDots) {
-            drawCheckedPoints(savedDetectedDots); // 점들을 화면에 복원
-          }
+        if (savedClickedDots) {
+          savedClickedDots.forEach((pt) => {
+            const geo = new THREE.SphereGeometry(0.05, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({ color: pt.color });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(pt.x, pt.y, 0);
+            scene.add(mesh);
+            areaDots.push(mesh);
+            clickedDots.push(pt);
+          });
         }
       });
+
       let selectingArea = false;
       let selectedVertices = [];
       let areaLine = null;
-      let detectedDots = [];
+      let clickedDots = [];
       let areaDots = [];
       let lastLidarData = null;
 
@@ -649,6 +652,19 @@
             });
         }
 
+        // [4] setAreaData 버튼 클릭 시 동작 추가
+        document.getElementById("setAreaData").addEventListener("click", () => {
+          const areaData = parseInt(
+            document.getElementById("areaDataValue").value
+          );
+          localStorage.setItem("areaData", areaData);
+          sendData(
+            "set_area_data",
+            { area_data: areaData },
+            "Area Data 설정 완료!"
+          );
+        });
+
         // 토글 버튼 적용
         toggleOptions("areaDataBtn", "areaDataOptions");
         toggleOptions("distanceRangeBtn", "distanceRangeOptions");
@@ -665,19 +681,7 @@
         updateRangeValue("minAngleValue", "minAngleValueLabel", "°");
         updateRangeValue("maxAngleValue", "maxAngleValueLabel", "°");
 
-        // 설정 버튼 이벤트 적용
-        document.getElementById("setAreaData").addEventListener("click", () => {
-          sendData(
-            "set_area_data",
-            {
-              area_data: parseInt(
-                document.getElementById("areaDataValue").value
-              ),
-            },
-            "Area Data 설정 완료!"
-          );
-        });
-
+        // selectAreaBtn을 눌러서 영역 선택 시작
         // selectAreaBtn을 눌러서 영역 선택 시작
         document
           .getElementById("selectAreaBtn")
@@ -722,7 +726,6 @@
             );
           });
 
-        // 클릭 이벤트로 포인트 추가
         const dotGeometry = new THREE.SphereGeometry(0.05, 16, 16);
         const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
@@ -744,45 +747,20 @@
           if (point) {
             selectedVertices.push(point.clone());
 
-            const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+            const dot = new THREE.Mesh(dotGeometry, dotMaterial.clone());
             dot.position.copy(point);
             scene.add(dot);
             areaDots.push(dot);
 
-            // 로컬 스토리지에 점 추가 (새로 고침 후에도 점을 복원)
-            const storedDots =
-              JSON.parse(localStorage.getItem("detectedDots")) || [];
-            storedDots.push({
-              x: point.x,
-              y: point.y,
-              color: dot.material.color.getHex(),
-            });
-            localStorage.setItem("detectedDots", JSON.stringify(storedDots));
-          }
-        });
+            const dotInfo = { x: point.x, y: point.y, color: 0xffffff };
+            clickedDots.push(dotInfo);
 
-        renderer.domElement.addEventListener("click", (event) => {
-          if (!selectingArea) return;
-
-          const mouse = new THREE.Vector2(
-            (event.clientX / window.innerWidth) * 2 - 1,
-            -(event.clientY / window.innerHeight) * 2 + 1
-          );
-
-          const raycaster = new THREE.Raycaster();
-          raycaster.setFromCamera(mouse, camera);
-
-          const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-          const point = new THREE.Vector3();
-          raycaster.ray.intersectPlane(plane, point);
-
-          if (point) {
-            selectedVertices.push(point.clone());
-
-            const dot = new THREE.Mesh(dotGeometry, dotMaterial);
-            dot.position.copy(point);
-            scene.add(dot);
-            areaDots.push(dot);
+            // 저장
+            localStorage.setItem(
+              "selectedVertices",
+              JSON.stringify(selectedVertices)
+            );
+            localStorage.setItem("clickedDots", JSON.stringify(clickedDots));
           }
         });
 
@@ -790,7 +768,6 @@
         document
           .getElementById("resetAreaBtn")
           .addEventListener("click", () => {
-            // 점들 제거
             areaDots.forEach((dot) => {
               scene.remove(dot);
               dot.geometry.dispose();
@@ -798,7 +775,6 @@
             });
             areaDots = [];
 
-            // 선 제거
             if (areaLine) {
               scene.remove(areaLine);
               areaLine.geometry.dispose();
@@ -807,13 +783,13 @@
             }
 
             selectedVertices = [];
+            clickedDots = [];
             selectingArea = false;
-            document.getElementById("finishSelectBtn").style.display = "none";
 
-            // 로컬 스토리지 초기화
             localStorage.removeItem("selectedVertices");
-            localStorage.removeItem("detectedDots");
-            localStorage.removeItem("areaLine");
+            localStorage.removeItem("clickedDots");
+
+            document.getElementById("finishSelectBtn").style.display = "none";
           });
 
         let minDistanceLimit = 0;
@@ -1016,6 +992,24 @@
         });
       };
 
+      function isVertexInViewAngle(vertex, minAngle, maxAngle) {
+        const dx = vertex.x - camera.position.x;
+        const dy = vertex.y - camera.position.y;
+
+        let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+        if (angleDeg < 0) angleDeg += 360;
+
+        minAngle = (minAngle + 360) % 360;
+        maxAngle = (maxAngle + 360) % 360;
+
+        if (minAngle <= maxAngle) {
+          return angleDeg >= minAngle && angleDeg <= maxAngle;
+        } else {
+          // 예: 350 ~ 10 도 같은 경우
+          return angleDeg >= minAngle || angleDeg <= maxAngle;
+        }
+      }
+
       // 설정 변경 시 저장하는 함수
       function saveSettings() {
         const selectedChannels = [];
@@ -1090,24 +1084,6 @@
             this.value + "cm";
           console.log("💾 Area Data 저장:", this.value);
         });
-
-      document.getElementById("setAreaData").addEventListener("click", () => {
-        const areaData = parseInt(
-          document.getElementById("areaDataValue").value
-        );
-
-        if (isNaN(areaData) || areaData < 0) {
-          alert("❌ 올바른 값을 입력하세요.");
-          return;
-        }
-
-        localStorage.setItem("areaData", areaData);
-        sendData(
-          "set_area_data",
-          { area_data: areaData },
-          "Area Data 설정 완료!"
-        );
-      });
 
       // 모든 입력 요소에 이벤트 추가 → 변경될 때 자동 저장
       document
@@ -1235,6 +1211,41 @@
         }
       }
 
+      function drawClickedPoints(points) {
+        areaDots.forEach((dot) => {
+          scene.remove(dot);
+          dot.geometry.dispose();
+          dot.material.dispose();
+        });
+        areaDots = [];
+
+        points.forEach((pt) => {
+          const geo = new THREE.SphereGeometry(0.05, 8, 8);
+          const mat = new THREE.MeshBasicMaterial({ color: pt.color });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(pt.x, pt.y, 0);
+          scene.add(mesh);
+          areaDots.push(mesh);
+        });
+      }
+
+      function isPointInsidePolygon(x, y, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+          const xi = polygon[i][0],
+            yi = polygon[i][1];
+          const xj = polygon[j][0],
+            yj = polygon[j][1];
+
+          const intersect =
+            yi > y !== yj > y &&
+            x < ((xj - xi) * (y - yi)) / (yj - yi + 0.00001) + xi;
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      }
+
+      // 폴리곤 내부의 점들이 색상에 맞게 그려집니다.
       function checkPointsInsidePolygon() {
         if (!selectedVertices || selectedVertices.length < 3 || !lastLidarData)
           return;
@@ -1245,7 +1256,6 @@
         );
         const lidarPoints = [];
 
-        // lastLidarData에서 각 채널의 모든 포인트 꺼내서 하나의 배열로 합침
         Object.values(lastLidarData).forEach((channelPoints) => {
           if (Array.isArray(channelPoints)) {
             lidarPoints.push(...channelPoints);
@@ -1254,31 +1264,17 @@
 
         const insidePoints = [];
 
+        for (const point of lidarPoints) {
+          const { x, y, distance } = point;
+
+          if (isPointInsidePolygon(x, y, polygon)) {
+            const color = distance >= areaSize ? 0x0000ff : 0xffffff;
+            insidePoints.push({ x, y, color });
+          }
+        }
+
+        // 이 부분은 색상만 지정하여 그리기 위한 것
         drawCheckedPoints(insidePoints);
-      }
-
-      // 점들을 다시 그릴 때 (drawCheckedPoints 함수 내)
-      function drawCheckedPoints(points) {
-        // 기존 점들 제거
-        detectedDots.forEach((dot) => {
-          scene.remove(dot);
-          dot.geometry.dispose();
-          dot.material.dispose();
-        });
-        detectedDots = []; // 기존 배열 초기화
-
-        // 새 점 추가
-        points.forEach((pt) => {
-          const geo = new THREE.SphereGeometry(0.05, 8, 8);
-          const mat = new THREE.MeshBasicMaterial({ color: pt.color });
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(pt.x, pt.y, 0); // 2D 평면 상의 좌표로 위치 설정
-          scene.add(mesh);
-          detectedDots.push(mesh); // 새로운 점들을 detectedDots 배열에 추가
-        });
-
-        // 로컬 스토리지에 저장
-        localStorage.setItem("detectedDots", JSON.stringify(points));
       }
 
       document.addEventListener("DOMContentLoaded", () => {
@@ -1299,24 +1295,42 @@
 
       let activeChannels = new Set([0, 1, 2, 3]);
 
+      // `ws.onmessage`에서 라이다 데이터 처리 (점 그리지 않음, 색상만 업데이트)
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-
-        // 데이터 저장
         lastLidarData = data.lidar_data;
 
-        // 방어 코드: areaLine이 정의돼 있을 때만 실행
-        if (typeof areaLine !== "undefined" && areaLine !== null) {
-          const detectionAreas = data.area_detection || {};
-          const isDetected = Object.values(detectionAreas).some((v) => v === 1);
-          areaLine.material.color.set(isDetected ? 0x0000ff : 0xffffff);
-        }
-
-        // 기존 Lidar 렌더링
+        // 기존 포인트 클라우드 처리
         if (data.lidar_data && data.distances) {
-          lastLidarData = data.lidar_data;
           updatePointCloud(lastLidarData, 4);
           updateDistanceTable(data.distances);
+        }
+
+        // 폴리곤 감지
+        if (selectedVertices.length >= 3 && areaLine) {
+          const polygon = selectedVertices.map((v) => [v.x, v.y]);
+          const areaSize = parseInt(
+            document.getElementById("areaDataValue").value
+          );
+          let isDetected = false;
+
+          Object.values(lastLidarData).forEach((channelPoints) => {
+            if (Array.isArray(channelPoints)) {
+              for (const point of channelPoints) {
+                if (
+                  isPointInsidePolygon(point.x, point.y, polygon) &&
+                  point.distance >= areaSize
+                ) {
+                  isDetected = true;
+                  break;
+                }
+              }
+            }
+            if (isDetected) return;
+          });
+
+          // 선 색상만 업데이트
+          areaLine.material.color.set(isDetected ? 0x0000ff : 0xffffff);
         }
       };
 
