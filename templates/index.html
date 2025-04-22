@@ -613,6 +613,11 @@
       let clickedDots = [];
       let areaDots = [];
       let lastLidarData = null;
+      let areaDataSet = false;
+      let areaSizeForDetection = null;
+      let detectedDots = [];
+      let polygonReadyToDetect = false;
+      let isAreaDetected = false; // 마지막 감지 상태 저장
 
       document.addEventListener("DOMContentLoaded", () => {
         // [1] 토글 기능 공통 함수
@@ -658,6 +663,8 @@
             document.getElementById("areaDataValue").value
           );
           localStorage.setItem("areaData", areaData);
+          areaSizeForDetection = areaData; // ✅ 이 값만 감지에서 사용
+          areaDataSet = true;
           sendData(
             "set_area_data",
             { area_data: areaData },
@@ -682,7 +689,6 @@
         updateRangeValue("maxAngleValue", "maxAngleValueLabel", "°");
 
         // selectAreaBtn을 눌러서 영역 선택 시작
-        // selectAreaBtn을 눌러서 영역 선택 시작
         document
           .getElementById("selectAreaBtn")
           .addEventListener("click", () => {
@@ -697,7 +703,6 @@
             document.getElementById("finishSelectBtn").style.display = "inline";
           });
 
-        // finishSelectBtn을 눌러서 폴리곤 생성
         document
           .getElementById("finishSelectBtn")
           .addEventListener("click", () => {
@@ -709,21 +714,52 @@
               return;
             }
 
-            // Polygon 그리기 (흰색 선)
+            // 폴리곤 그리기 (초기에는 흰색 선)
             const geometry = new THREE.BufferGeometry().setFromPoints([
               ...selectedVertices,
-              selectedVertices[0], // 첫 번째 점으로 돌아가서 닫는 폴리곤
+              selectedVertices[0],
             ]);
             const material = new THREE.LineBasicMaterial({ color: 0xffffff });
             areaLine = new THREE.Line(geometry, material);
             scene.add(areaLine);
 
-            checkPointsInsidePolygon(); // 내부 포인트 검사 및 색상 결정
-            // 로컬 스토리지에 저장
             localStorage.setItem(
               "selectedVertices",
               JSON.stringify(selectedVertices)
             );
+
+            areaDataSet = true;
+
+            // ✅ lastLidarData에서 감지 여부 판단
+            if (lastLidarData) {
+              const polygon = selectedVertices.map((v) => [v.x, v.y]);
+              let isDetected = false;
+
+              Object.values(lastLidarData).forEach((channelPoints) => {
+                if (Array.isArray(channelPoints)) {
+                  for (const point of channelPoints) {
+                    if (
+                      isPointInsidePolygon(point.x, point.y, polygon) &&
+                      point.areas &&
+                      point.areas.area_1 === 1
+                    ) {
+                      isDetected = true;
+                      break;
+                    }
+                  }
+                }
+                if (isDetected) return;
+              });
+
+              isAreaDetected = isDetected;
+              localStorage.setItem(
+                "isAreaDetected",
+                isDetected ? "true" : "false"
+              );
+              areaLine.material.color.set(isDetected ? 0x0000ff : 0xffffff);
+            }
+
+            polygonReadyToDetect = true; // 다음 프레임에서도 다시 감지할 수 있도록
           });
 
         const dotGeometry = new THREE.SphereGeometry(0.05, 16, 16);
@@ -990,6 +1026,11 @@
           savedSelfCheck,
           savedAreaData,
         });
+        // Area 감지 상태 복원
+        const savedDetection = localStorage.getItem("isAreaDetected");
+        if (savedDetection === "true" && areaLine) {
+          areaLine.material.color.set(0x0000ff);
+        }
       };
 
       function isVertexInViewAngle(vertex, minAngle, maxAngle) {
@@ -1211,21 +1252,23 @@
         }
       }
 
-      function drawClickedPoints(points) {
-        areaDots.forEach((dot) => {
+      function drawDetectedPoints(points) {
+        // 이전 감지 점 제거
+        detectedDots.forEach((dot) => {
           scene.remove(dot);
           dot.geometry.dispose();
           dot.material.dispose();
         });
-        areaDots = [];
+        detectedDots = [];
 
+        // 새로 감지된 점 그리기
         points.forEach((pt) => {
           const geo = new THREE.SphereGeometry(0.05, 8, 8);
           const mat = new THREE.MeshBasicMaterial({ color: pt.color });
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.set(pt.x, pt.y, 0);
           scene.add(mesh);
-          areaDots.push(mesh);
+          detectedDots.push(mesh);
         });
       }
 
@@ -1274,7 +1317,7 @@
         }
 
         // 이 부분은 색상만 지정하여 그리기 위한 것
-        drawCheckedPoints(insidePoints);
+        drawDetectedPoints(insidePoints);
       }
 
       document.addEventListener("DOMContentLoaded", () => {
@@ -1307,11 +1350,9 @@
         }
 
         // 폴리곤 감지
-        if (selectedVertices.length >= 3 && areaLine) {
+        if (selectedVertices.length >= 3 && areaLine && areaDataSet) {
           const polygon = selectedVertices.map((v) => [v.x, v.y]);
-          const areaSize = parseInt(
-            document.getElementById("areaDataValue").value
-          );
+          const areaSize = areaSizeForDetection;
           let isDetected = false;
 
           Object.values(lastLidarData).forEach((channelPoints) => {
@@ -1329,7 +1370,11 @@
             if (isDetected) return;
           });
 
-          // 선 색상만 업데이트
+          // ✅ 감지 상태 저장
+          isAreaDetected = isDetected;
+          localStorage.setItem("isAreaDetected", isDetected ? "true" : "false");
+
+          // ✅ 선 색상 업데이트
           areaLine.material.color.set(isDetected ? 0x0000ff : 0xffffff);
         }
       };
